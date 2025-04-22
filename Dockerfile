@@ -32,12 +32,12 @@ RUN git clone -b ros2 https://github.com/KumarRobotics/ublox.git && \
 
 WORKDIR /root/ros2_ws
 
-RUN source /opt/ros/humble/setup.bash && \
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
     colcon build --symlink-install --packages-select ublox_serialization && \
     colcon build --symlink-install --packages-select ublox_msgs && \
     colcon build --symlink-install --packages-select tier4_debug_msgs && \
     colcon build --symlink-install --packages-select autoware_sensing_msgs && \
-    source install/setup.bash
+    source install/setup.bash"
 
 RUN echo "source /root/ros2_ws/install/setup.bash" >> ~/.bashrc
 
