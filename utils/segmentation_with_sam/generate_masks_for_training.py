@@ -10,6 +10,31 @@ import glob
 import shutil
 from tqdm import tqdm
 import torch
+from torchvision import transforms
+
+def preprocess_image(image_pil):
+
+    # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) to L channel
+    img_np = np.array(image_pil)
+    lab = cv2.cvtColor(img_np, cv2.COLOR_RGB2LAB)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    lab[:, :, 0] = clahe.apply(lab[:, :, 0])
+    
+    # Convert back to RGB
+    enhanced_img = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+    enhanced_pil = Image.fromarray(enhanced_img)
+    
+    normalize = transforms.Compose([
+        transforms.ToTensor(),
+        # transforms.Lambda(lambda x: x / 255.0),
+        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        # transforms.Lambda(lambda x: x * 255.0),
+        transforms.ToPILImage(),
+    ])
+    
+    normalized_img = normalize(enhanced_pil)
+    
+    return normalized_img
 
 def generate_annotations(input_dir, output_dir, model_name="sam2.1_hiera_small", save_visualizations=False, min_area=100, subset="default"):
     
@@ -57,11 +82,11 @@ def generate_annotations(input_dir, output_dir, model_name="sam2.1_hiera_small",
         {"id": 2, "name": "Sky", "color": [135, 206, 235]},    # Sky Blue
         {"id": 3, "name": "Building", "color": [70, 70, 70]},  # Dark Gray
         {"id": 4, "name": "Grass", "color": [0, 128, 0]},      # Green
-        {"id": 5, "name": "Sand/Mud", "queries": ["Sand", "Mud"], "color": [210, 180, 140]},  # Tan
-        {"id": 6, "name": "Road/Pavement", "queries": ["Road", "Asphalt", "Cobblestone"], "color": [128, 128, 128]},  # Gray
+        {"id": 5, "name": "Sand/Mud", "queries": ["Sand", "Mud", "Ground"], "color": [210, 180, 140]},  # Tan
+        {"id": 6, "name": "Road/Pavement", "queries": ["Road", "Asphalt", "Cobblestone", "Street"], "color": [128, 128, 128]},  # Gray
         {"id": 7, "name": "Fence", "color": [139, 69, 19]},    # Brown
         {"id": 8, "name": "Tree", "color": [34, 139, 34]},     # Forest Green
-        {"id": 9, "name": "Street Furniture", "queries": ["Sign", "Lamp", "Pole", "Cone", "Bike"], "color": [255, 215, 0]},  # Gold
+        {"id": 9, "name": "Street Furniture", "queries": ["Road sign", "Street lamp", "Street light", "Traffic sign", "Pole", "Cone", "Bike", "Handicapped sign"], "color": [255, 215, 0]},  # Gold
         {"id": 10, "name": "Vehicle", "queries": ["Car", "Truck"], "color": [255, 0, 0]},  # Red
         {"id": 11, "name": "Person", "color": [255, 192, 203]}  # Pink
     ]
@@ -139,6 +164,9 @@ def generate_annotations(input_dir, output_dir, model_name="sam2.1_hiera_small",
             image_dest = os.path.join(images_output_dir, image_filename)
             shutil.copy2(image_path, image_dest)
 
+            # Preprocess the image
+            image_pil = preprocess_image(image_pil)
+
             print(f"\nProcessing {image_filename}")
             
             # Initialize an ID mask with background/other (category 1)
@@ -163,8 +191,11 @@ def generate_annotations(input_dir, output_dir, model_name="sam2.1_hiera_small",
                     
                     if torch.cuda.is_available():
                         torch.cuda.empty_cache()
-                    
-                    result = model.predict([image_pil], [query], box_threshold=0.35, text_threshold=0.3)
+
+                    if query == 'road sign. street lamp. street light. traffic sign. pole. cone. bike. handicapped sign.':
+                        result = model.predict([image_pil], [query], box_threshold=0.125, text_threshold=0.2)
+                    else:
+                        result = model.predict([image_pil], [query], box_threshold=0.35, text_threshold=0.3)
                     
                     if result and isinstance(result[0], dict) and 'masks' in result[0] and result[0]['masks'] is not None:
                         masks = result[0]['masks']
