@@ -146,9 +146,27 @@ def generate_annotations(input_dir, output_dir,
         except Exception as e:
             print(f"Skipped {img_path}: {e}")
 
-    # dump manifest
+
+    classes = {
+        1: "Other",
+        2: "Sky",
+        3: "Building",
+        4: "Grass",
+        5: "Sand, Mud",
+        6: "Road, Asphalt, Cobblestone",
+        7: "Fence",
+        8: "Tree",
+        9: "Sign, Lamp, Pole, Cone, Bike",
+        10: "Car, Truck",
+        11: "Person"
+    }
+
     with open(os.path.join(output_dir, "robo_manifest.json"), "w") as f:
-        json.dump({"annotations": manifest}, f, indent=4)
+        json.dump({
+            "classes": classes,
+            "annotations": manifest
+        }, f, indent=4)
+
 
     print(f"Done — {len(manifest)} entries in robo_manifest.json")
 
