@@ -28,20 +28,6 @@ class CacheCleanCallback(Callback):
             torch.cuda.empty_cache()
             gc.collect()
 
-num_classes = 12
-batch_size = 12
-epochs = 30
-learning_rate = 1e-3
-img_height = 608
-img_width = 960
-use_cuda = torch.cuda.is_available()
-device = torch.device("cuda" if use_cuda else "cpu")
-
-value_mapping = {
-    0: 0, 70: 1, 75: 2, 76: 3, 84: 4, 95: 5,
-    128: 2, 184: 7, 188: 8, 202: 9, 212: 10, 96: 11
-}
-
 
 num_classes = 12
 batch_size = 12
