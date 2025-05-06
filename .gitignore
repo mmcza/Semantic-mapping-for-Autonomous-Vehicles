@@ -172,3 +172,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Training logs
+segmentation_model_training/checkpoints/*
+segmentation_model_training/logs/*
+segmentation_node/*
