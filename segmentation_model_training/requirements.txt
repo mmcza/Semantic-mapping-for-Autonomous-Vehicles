@@ -1,0 +1,17 @@
+torch
+torchvision
+segmentation-models-pytorch
+albumentations
+opencv-python
+scikit-learn
+numpy
+tqdm
+matplotlib
+pillow
+wandb
+pytorch-lightning
+monai
+typer[all]
+tensorboard
+onnx
+onnxruntime
