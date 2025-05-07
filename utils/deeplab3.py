@@ -5,7 +5,8 @@ import numpy as np
 import torch
 import torch.optim as optim
 import lightning.pytorch as pl
-from lightning.pytorch.callbacks import Callback
+from lightning.pytorch.callbacks import Callback, ModelCheckpoint
+from lightning.pytorch.loggers import TensorBoardLogger
 import matplotlib.pyplot as plt
 import segmentation_models_pytorch as smp
 from albumentations import Compose, Resize, PadIfNeeded, Normalize
@@ -89,7 +90,7 @@ class SegModel(pl.LightningModule):
     def __init__(self):
         super().__init__()
         self.model = smp.DeepLabV3Plus(
-            encoder_name='tu-resnet18',
+            encoder_name='tu-efficientnet_b3',  
             encoder_weights='imagenet',
             classes=num_classes,
             activation=None
@@ -106,13 +107,8 @@ class SegModel(pl.LightningModule):
         intersection = (probs * one_hot).sum()
         union = probs.sum() + one_hot.sum()
         dice_loss = 1 - (2 * intersection + 1e-6) / (union + 1e-6)
-        if stage == 'train':
-            self.log(f"{stage}_loss", dice_loss, prog_bar=True, on_step=True, on_epoch=True)
-            self.log(f"{stage}_dice", 1 - dice_loss, prog_bar=True, on_epoch=True)
-        elif stage == 'val':
-            self.log(f"{stage}_loss", dice_loss, prog_bar=True, on_step=False, on_epoch=True)
-            self.log(f"{stage}_dice", 1 - dice_loss, prog_bar=True, on_step=False, on_epoch=True)
-
+        self.log(f"{stage}_loss", dice_loss, prog_bar=True, on_epoch=True)
+        self.log(f"{stage}_dice", 1 - dice_loss, prog_bar=True, on_epoch=True)
         return dice_loss
 
     def training_step(self, batch, batch_idx):
@@ -130,13 +126,9 @@ class SegModel(pl.LightningModule):
             raise ValueError(f"Unknown optimizer type: {optimizer_type}")
 
         if scheduler_type == 'reduce_lr_plateau':
-            scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, factor=0.5, patience=3
-            )
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=3)
         elif scheduler_type == 'one_cycle':
-            scheduler = optim.lr_scheduler.OneCycleLR(
-                optimizer, max_lr=learning_rate, total_steps=epochs
-            )
+            scheduler = optim.lr_scheduler.OneCycleLR(optimizer, max_lr=learning_rate, total_steps=epochs)
         else:
             raise ValueError(f"Unknown scheduler type: {scheduler_type}")
 
@@ -144,7 +136,6 @@ class SegModel(pl.LightningModule):
 
 def prepare_datasets(root_path, transform):
     datasets = []
-
     for folder in sorted(Path(root_path).iterdir()):
         if folder.name.startswith("images_2025"):
             img_dir = folder / "images" / "default"
@@ -185,12 +176,13 @@ def parse_args():
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--optimizer', type=str, default='adamw', choices=['adamw', 'sgd'])
     parser.add_argument('--scheduler', type=str, default='reduce_lr_plateau', choices=['reduce_lr_plateau', 'one_cycle'])
-    parser.add_argument('--root_dir', type=str, default="/root/Shared/annotations2/"")
+    parser.add_argument('--root_dir', type=str, default="/root/Shared/annotations2/")
     return parser.parse_args()
 
 def main():
     args = parse_args()
 
+    global epochs, batch_size, learning_rate
     epochs = args.epochs
     batch_size = args.batch_size
     learning_rate = args.learning_rate
@@ -201,7 +193,6 @@ def main():
     print(f"Training for {epochs} epochs with batch size {batch_size}, learning rate {learning_rate}, optimizer {optimizer_type}, scheduler {scheduler_type}")
 
     transform = create_transform()
-    root_dir =  "/root/Shared/annotations2/"
     full_dataset = prepare_datasets(root_dir, transform)
 
     dataset_size = len(full_dataset)
@@ -209,23 +200,21 @@ def main():
     train_size = dataset_size - val_size
     train_dataset, val_dataset = torch.utils.data.random_split(full_dataset, [train_size, val_size])
 
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True
-    )
-
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=4,
-        pin_memory=True
-    )
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
     model = SegModel().to(device)
+
+ 
+    logger = TensorBoardLogger("logs", name="segmentation_model")
+
+
+    checkpoint = ModelCheckpoint(
+        monitor='val_dice',
+        mode='max',
+        save_top_k=1,
+        filename='best-model-{epoch:02d}-{val_dice:.4f}'
+    )
 
     trainer = pl.Trainer(
         max_epochs=epochs,
@@ -233,7 +222,8 @@ def main():
         devices=1 if use_cuda else None,
         precision=32,
         log_every_n_steps=10,
-        callbacks=[CacheCleanCallback()]
+        callbacks=[CacheCleanCallback(), checkpoint],
+        logger=logger
     )
 
     trainer.fit(model, train_loader, val_loader)
@@ -245,3 +235,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
