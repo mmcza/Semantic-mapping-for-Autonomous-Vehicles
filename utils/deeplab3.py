@@ -193,6 +193,7 @@ def main():
     print(f"Training for {epochs} epochs with batch size {batch_size}, learning rate {learning_rate}, optimizer {optimizer_type}, scheduler {scheduler_type}")
 
     transform = create_transform()
+    root_dir = "/root/Shared/annotations2/"
     full_dataset = prepare_datasets(root_dir, transform)
 
     dataset_size = len(full_dataset)
