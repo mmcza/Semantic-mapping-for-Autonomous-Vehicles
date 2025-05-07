@@ -185,7 +185,7 @@ def parse_args():
     parser.add_argument('--learning_rate', type=float, default=1e-3)
     parser.add_argument('--optimizer', type=str, default='adamw', choices=['adamw', 'sgd'])
     parser.add_argument('--scheduler', type=str, default='reduce_lr_plateau', choices=['reduce_lr_plateau', 'one_cycle'])
-    parser.add_argument('--root_dir', type=str, default="/home/daria/Downloads/Semantic-mapping-for-Autonomous-Vehicles-main/annotations2/")
+    parser.add_argument('--root_dir', type=str, default="/root/Shared/annotations2/"")
     return parser.parse_args()
 
 def main():
