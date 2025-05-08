@@ -1,176 +1,154 @@
 import os
-import shutil
-import tkinter as tk
-from tkinter import ttk
 from pathlib import Path
+from tkinter import Tk, Canvas, StringVar, NW
+from tkinter import ttk
 from PIL import Image, ImageTk
-import argparse
 
-def load_folders(root_dir):
-    return sorted([f for f in Path(root_dir).iterdir() if f.name.startswith("images_2025")])
 
-def setup_window():
-    window = tk.Tk()
-    window.title("Annotation Cleanup Tool")
-    window.geometry("1200x800")
-    return window
+CLASS_NAMES = [
+    "Other", "Sky", "Building", "Grass", "Sand/Mud", "Road/Pavement",
+    "Fence", "Tree", "Street Furniture", "Vehicle", "Person"
+]
 
-def setup_frames(window):
-    image_frame = ttk.Frame(window)
-    image_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+CLASS_COLORS = [
+    [0, 0, 0], [135, 206, 235], [70, 70, 70], [0, 128, 0],
+    [210, 180, 140], [128, 128, 128], [139, 69, 19], [34, 139, 34], 
+    [255, 215, 0], [255, 0, 0], [255, 192, 203]
+]
 
-    control_frame = ttk.Frame(window)
-    control_frame.pack(side=tk.RIGHT, fill=tk.BOTH, padx=10, pady=10)
+def collect_image_pairs(root_dir):
+    annotations_dir = Path(root_dir) / "annotations2"
+    pairs = {}
 
-    return image_frame, control_frame
+    for subdir in annotations_dir.iterdir():
+        vis_dir = subdir / "visualizations"
+        img_dir = subdir / "images"/ "default"
+        if vis_dir.exists() and img_dir.exists():
+            for seg_path in vis_dir.glob("*_segmentation.png"):
+            # Extract the base part of the filename (before _segmentation.png)
+                base_name = seg_path.stem.replace("_segmentation", "")
+            # Look for corresponding raw image
+                raw_path = img_dir / f"{base_name}.png"
+                if raw_path.exists():
+                    pairs[seg_path] = raw_path
 
-def setup_canvas(image_frame):
-    canvas = tk.Canvas(image_frame, bg="black")
-    canvas.pack(fill=tk.BOTH, expand=True)
-    return canvas
+        return pairs
 
-def setup_labels(control_frame):
-    vars = {
-        "status": tk.StringVar(value="Ready"),
-        "progress": tk.StringVar(value="0/0"),
-        "deleted": tk.StringVar(value="Deleted: 0"),
-        "path": tk.StringVar()
-    }
+def display_images(canvas, seg_path, raw_path, status_var):
+    try:
+        raw_img = Image.open(raw_path).convert('RGB')
+        seg_img = Image.open(seg_path).convert('RGB')
+    except Exception as e:
+        status_var.set(f"Error loading images: {e}")
+        return False
 
-    for label in ["status", "progress", "deleted", "path"]:
-        ttk.Label(control_frame, textvariable=vars[label], wraplength=200).pack(pady=5)
+    raw_photo = ImageTk.PhotoImage(raw_img)
+    seg_photo = ImageTk.PhotoImage(seg_img)
 
-    return vars
+    canvas.config(width=max(raw_img.width, seg_img.width),
+                  height=raw_img.height + seg_img.height)
+    canvas.delete("all")
+    canvas.create_image(0, 0, anchor=NW, image=raw_photo)
+    canvas.create_image(0, raw_img.height, anchor=NW, image=seg_photo)
 
-def setup_buttons(control_frame, actions):
-    ttk.Button(control_frame, text="Keep & Next", command=actions['next']).pack(fill=tk.X, pady=5)
-    ttk.Button(control_frame, text="Delete Image", command=actions['delete']).pack(fill=tk.X, pady=5)
-    ttk.Button(control_frame, text="Exit", command=actions['exit']).pack(fill=tk.X, pady=20)
+    canvas.raw_photo = raw_photo
+    canvas.seg_photo = seg_photo
 
-def resize_image(img, width):
-    ratio = width / img.width
-    height = int(img.height * ratio)
-    return img.resize((width, height))
+    return True
 
-def move_to_removed(img_path, mask_path, backup_root):
-    img_backup = backup_root / "images" / "default"
-    mask_backup = backup_root / "visualizations"
+def create_legend(frame):
+    ttk.Label(frame, text="Class Legend:").pack(pady=5)
+    legend_frame = ttk.Frame(frame)
+    legend_frame.pack(pady=5)
 
-    img_backup.mkdir(parents=True, exist_ok=True)
-    mask_backup.mkdir(parents=True, exist_ok=True)
+    for i, (color, name) in enumerate(zip(CLASS_COLORS, CLASS_NAMES)):
+        hex_color = f"#{color[0]:02x}{color[1]:02x}{color[2]:02x}"
+        color_box = Canvas(legend_frame, width=20, height=20, bg=hex_color, highlightthickness=1)
+        color_box.grid(row=i, column=0, padx=5, pady=2)
+        ttk.Label(legend_frame, text=name).grid(row=i, column=1, sticky="w")
 
-    shutil.move(str(img_path), str(img_backup / img_path.name))
-    shutil.move(str(mask_path), str(mask_backup / mask_path.name))
+def annotation_viewer(root_dir):
+    image_pairs = collect_image_pairs(root_dir)
+    seg_files = list(image_pairs.keys())
+    raw_files = [image_pairs[s] for s in seg_files]
 
-def annotation_cleanup_tool(root_dir):
-    folders = load_folders(root_dir)
-    if not folders:
-        print("No folders found.")
+    if not seg_files:
+        print("No image pairs found.")
         return
 
-    window = setup_window()
-    image_frame, control_frame = setup_frames(window)
-    canvas = setup_canvas(image_frame)
-    vars = setup_labels(control_frame)
+    window = Tk()
+    window.title("Segmentation Viewer")
+    window.geometry("1600x1000")
 
-    current = {
-        "folder_idx": 0,
-        "image_idx": 0,
-        "img_paths": [],
-        "mask_paths": [],
-        "folder": None
-    }
-    deleted = set()
-    processed = set()
+    canvas = Canvas(window, bg="black")
+    canvas.pack(side="left", fill="both", expand=True)
 
-    def load_folder():
-        if current["folder_idx"] >= len(folders):
-            vars["status"].set("All folders processed.")
-            return False
+    control = ttk.Frame(window, width=250)
+    control.pack(side="right", fill="y", padx=10, pady=10)
 
-        folder = folders[current["folder_idx"]]
-        current["folder"] = folder
-        img_dir = folder / "images" / "default"
-        mask_dir = folder / "visualizations"
+    status_var = StringVar(value="Ready")
+    progress_var = StringVar()
+    file_var = StringVar()
 
-        if not img_dir.exists() or not mask_dir.exists():
-            current["folder_idx"] += 1
-            return load_folder()
+    ttk.Label(control, textvariable=status_var, wraplength=200).pack(pady=5)
+    ttk.Label(control, textvariable=progress_var).pack(pady=5)
+    ttk.Label(control, textvariable=file_var, wraplength=200).pack(pady=5)
 
-        current["img_paths"] = sorted(img_dir.glob("*_image_raw_*.png"))
-        current["mask_paths"] = sorted(mask_dir.glob("*_segmentation.png"))
-        current["image_idx"] = 0
+    create_legend(control)
 
-        if not current["img_paths"]:
-            current["folder_idx"] += 1
-            return load_folder()
+    idx = [0]
 
-        vars["status"].set(f"Loaded: {folder.name}")
-        return True
-
-    def show_image():
-        idx = current["image_idx"]
-        if idx >= len(current["img_paths"]):
-            current["folder_idx"] += 1
-            if not load_folder():
-                return
-            idx = 0
-
-        img_path = current["img_paths"][idx]
-        mask_path = current["mask_paths"][idx]
-
-        if str(img_path) in processed:
-            current["image_idx"] += 1
-            return show_image()
-
-        img = Image.open(img_path).convert("RGB")
-        img = resize_image(img, 800)
-
-        photo = ImageTk.PhotoImage(img)
-        canvas.config(width=img.width, height=img.height)
-        canvas.create_image(0, 0, anchor=tk.NW, image=photo)
-        canvas.image = photo
-
-        vars["progress"].set(f"{idx + 1}/{len(current['img_paths'])}")
-        vars["path"].set(f"{img_path.name}")
+    def load(i):
+        if 0 <= i < len(seg_files):
+            success = display_images(canvas, seg_files[i], raw_files[i], status_var)
+            if success:
+                idx[0] = i
+                progress_var.set(f"{i + 1} / {len(seg_files)}")
+                file_var.set(raw_files[i].name)
 
     def next_image():
-        processed.add(str(current["img_paths"][current["image_idx"]]))
-        current["image_idx"] += 1
-        show_image()
+        if idx[0] + 1 < len(seg_files):
+            load(idx[0] + 1)
 
-    def delete_image():
-        idx = current["image_idx"]
-        img_path = current["img_paths"][idx]
-        mask_path = current["mask_paths"][idx]
+    def prev_image():
+        if idx[0] > 0:
+            load(idx[0] - 1)
 
-        move_to_removed(img_path, mask_path, Path(root_dir) / "removed" / current["folder"].name)
-        deleted.add(str(img_path))
+    def delete_current():
+        i = idx[0]
+        if i >= len(seg_files):
+            return
 
-        current["img_paths"].pop(idx)
-        current["mask_paths"].pop(idx)
+        seg = seg_files[i]
+        raw = raw_files[i]
 
-        vars["deleted"].set(f"Deleted: {len(deleted)}")
-        vars["status"].set(f"Deleted: {img_path.name}")
-        show_image()
+        try:
+            os.remove(seg)
+            os.remove(raw)
+            status_var.set(f"Deleted: {seg.name} and {raw.name}")
+        except Exception as e:
+            status_var.set(f"Error deleting: {e}")
+            return
 
-    setup_buttons(control_frame, {
-        "next": next_image,
-        "delete": delete_image,
-        "exit": window.destroy
-    })
+        del seg_files[i]
+        del raw_files[i]
 
-    if load_folder():
-        show_image()
+        if i >= len(seg_files):
+            idx[0] = max(0, len(seg_files) - 1)
 
+        if seg_files:
+            load(idx[0])
+        else:
+            status_var.set("No images left")
+
+    ttk.Button(control, text="Previous", command=prev_image).pack(fill="x", pady=5)
+    ttk.Button(control, text="Next", command=next_image).pack(fill="x", pady=5)
+    ttk.Button(control, text="Delete Files", command=delete_current).pack(fill="x", pady=5)
+    ttk.Button(control, text="Exit", command=window.destroy).pack(fill="x", pady=20)
+
+    load(0)
     window.mainloop()
-    print(f"Finished. Processed: {len(processed)}, Deleted: {len(deleted)}")
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--root_dir', type=str, default= "/root/Shared/annotations2/")
-    return parser.parse_args()
+annotation_viewer("/home/daria/Downloads/Semantic-mapping-for-Autonomous-Vehicles-main")
 
-def main():
-    args = parse_args()
-    annotation_cleanup_tool(args.root_dir)
+
