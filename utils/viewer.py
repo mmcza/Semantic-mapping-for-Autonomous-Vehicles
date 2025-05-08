@@ -11,7 +11,7 @@ def load_folders(root_dir):
 
 def setup_window():
     window = tk.Tk()
-    window.title("Leaf Annotation Cleanup Tool")
+    window.title("Annotation Cleanup Tool")
     window.geometry("1200x800")
     return window
 
