@@ -1,18 +1,4 @@
-import os
-from pathlib import Path
-import gc
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import lightning.pytorch as pl
-from lightning.pytorch.callbacks import Callback
-import matplotlib.pyplot as plt
-from albumentations import Compose, Resize, PadIfNeeded, Normalize
-from albumentations.pytorch import ToTensorV2
-from PIL import Image
-from torch.utils.data import Dataset, DataLoader, ConcatDataset
+
 
 #based on  https://github.com/XuJiacong/PIDNet
 
@@ -21,7 +7,7 @@ import gc
 import numpy as np
 from pathlib import Path
 from PIL import Image
-
+import numpy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
