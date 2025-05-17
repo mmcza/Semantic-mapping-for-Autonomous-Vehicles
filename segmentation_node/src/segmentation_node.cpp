@@ -2,7 +2,8 @@
 
 SegmentationNode::SegmentationNode() 
     : Node("segmentation_node"), 
-      env_(ORT_LOGGING_LEVEL_WARNING, "segmentation_session")
+      env_(ORT_LOGGING_LEVEL_WARNING, "segmentation_session"),
+      qos_(10)
 {
     // Declare and get parameters
     declare_parameter("camera_frame", "camera_front_optical_link");
@@ -31,13 +32,12 @@ SegmentationNode::SegmentationNode()
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
     // Initialize proper QoS settings for the camera info subscriber
-    auto qos = rclcpp::QoS(10);
-    qos.best_effort();
-    qos.durability_volatile();
+    qos_.best_effort();
+    qos_.durability_volatile();
 
     // Get the camera info
     camera_info_sub_ = create_subscription<sensor_msgs::msg::CameraInfo>(
-        camera_info_topic_, qos,
+        camera_info_topic_, qos_,
         std::bind(&SegmentationNode::camera_info_callback, this, std::placeholders::_1));
     
     RCLCPP_INFO(get_logger(), "Waiting for camera info...");
@@ -57,16 +57,16 @@ void SegmentationNode::camera_info_callback(const sensor_msgs::msg::CameraInfo::
     camera_info_.fromMsg(msg);
     camera_info_received_ = true;
     
-    RCLCPP_INFO(get_logger(), "Camera info received: %dx%d, fx=%.2f, fy=%.2f, cx=%.2f, cy=%.2f",
+    RCLCPP_INFO(get_logger(), "Camera info received: resolution %dx%d, fx=%.2f, fy=%.2f, cx=%.2f, cy=%.2f",
                 camera_info_.width, camera_info_.height, 
                 camera_info_.fx, camera_info_.fy,
                 camera_info_.cx, camera_info_.cy);
     
     // Set up synchronization for image and point cloud
     image_sub_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(
-        this, camera_image_topic_);
+        this, camera_image_topic_, qos_.get_rmw_qos_profile());
     point_cloud_sub_ = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>(
-        this, lidar_pointcloud_topic_);
+        this, lidar_pointcloud_topic_, qos_.get_rmw_qos_profile());
     
     // Initialize synchronizer
     synchronizer_ = std::make_shared<message_filters::Synchronizer<SyncPolicy>>(
