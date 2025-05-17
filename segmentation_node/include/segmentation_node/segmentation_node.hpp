@@ -110,6 +110,9 @@ private:
     std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>> image_sub_;
     std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>> point_cloud_sub_;
 
+    // QoS settings
+    rclcpp::QoS qos_;
+    
     // Synchronization
     typedef message_filters::sync_policies::ApproximateTime<
         sensor_msgs::msg::Image,
