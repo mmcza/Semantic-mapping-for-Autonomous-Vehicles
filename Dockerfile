@@ -41,4 +41,45 @@ RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
 
 RUN echo "source /root/ros2_ws/install/setup.bash" >> ~/.bashrc
 
-WORKDIR /root/Shared/
+# Install CUDA 12.4
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
+    && dpkg -i cuda-keyring_1.1-1_all.deb \
+    && rm cuda-keyring_1.1-1_all.deb \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends cuda-toolkit-12-4 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install cuDNN 9 for CUDA 12
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcudnn9-cuda-12 \
+    libcudnn9-dev-cuda-12 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add CUDA paths to environment
+ENV PATH /usr/local/cuda-12.4/bin:${PATH}
+ENV LD_LIBRARY_PATH /usr/local/cuda-12.4/lib64:${LD_LIBRARY_PATH}
+
+# Install ONNX Runtime 1.19 with GPU support for C++
+WORKDIR /tmp
+RUN wget https://github.com/microsoft/onnxruntime/releases/download/v1.19.0/onnxruntime-linux-x64-gpu-1.19.0.tgz \
+    && mkdir -p /usr/local/onnxruntime \
+    && tar -xzf onnxruntime-linux-x64-gpu-1.19.0.tgz -C /usr/local/onnxruntime --strip-components=1 \
+    && rm onnxruntime-linux-x64-gpu-1.19.0.tgz
+
+# Set ONNX Runtime environment variables
+ENV ONNXRUNTIME_ROOT_DIR=/usr/local/onnxruntime
+ENV PATH=${ONNXRUNTIME_ROOT_DIR}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${ONNXRUNTIME_ROOT_DIR}/lib:${LD_LIBRARY_PATH}
+ENV CMAKE_PREFIX_PATH=${ONNXRUNTIME_ROOT_DIR}:${CMAKE_PREFIX_PATH}
+
+# Install PCL and related packages
+RUN apt-get update && apt-get install -y \
+    ros-humble-pcl-conversions \
+    ros-humble-pcl-ros \
+    ros-humble-ros-core \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /root/ros2_ws
