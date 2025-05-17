@@ -28,6 +28,7 @@ docker run -it --rm \
 	--volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" --privileged \
 	--volume="/home/$user/Semantic-mapping-for-Autonomous-Vehicles:/root/Shared/Semantic-mapping-for-Autonomous-Vehicles:rw" \
     --volume="/home/$user/samochodzik_rosbag:/root/Shared/rosbags:rw" \
+	--volume="/home/$user/Downloads/png_data/saved_models/:/root/Shared/saved_models:rw" \
 	--gpus all \
 	--env="XAUTHORITY=$XAUTH" \
 	--volume="$XAUTH:$XAUTH" \

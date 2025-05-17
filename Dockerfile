@@ -39,8 +39,6 @@ RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
     colcon build --symlink-install --packages-select autoware_sensing_msgs && \
     source install/setup.bash"
 
-RUN echo "source /root/ros2_ws/install/setup.bash" >> ~/.bashrc
-
 # Install CUDA 12.4
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb \
     && dpkg -i cuda-keyring_1.1-1_all.deb \
@@ -83,3 +81,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /root/ros2_ws
+
+# Copy segmentation_node to the workspace
+COPY ./segmentation_node /root/ros2_ws/src/
+
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
+    colcon build --symlink-install --packages-select segmentation_node && \
+    source install/setup.bash"
+    
+RUN echo "source /root/ros2_ws/install/setup.bash" >> ~/.bashrc

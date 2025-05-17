@@ -25,6 +25,8 @@ struct CameraInfo {
     // Original camera info parameters
     int height;
     int width;
+    int undistorted_width;
+    int undistorted_height;
     std::string distortion_model;
     std::vector<double> d;
     
@@ -32,53 +34,27 @@ struct CameraInfo {
     Eigen::Matrix3d K;
     Eigen::Matrix3d R;
     Eigen::Matrix<double, 3, 4> P;
+    Eigen::Matrix3d undistorted_K;
+    Eigen::Matrix3d undistorted_R;
+    Eigen::Matrix<double, 3, 4> undistorted_P;
     
     // Common camera parameters for quick access
     double fx, fy;
     double cx, cy;
+    double undistorted_fx, undistorted_fy;
+    double undistorted_cx, undistorted_cy;
     
-    // Utility methods
-    void fromMsg(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& msg) {
-        // Store basic info
-        height = msg->height;
-        width = msg->width;
-        distortion_model = msg->distortion_model;
-        d = msg->d;
-        
-        // Convert K (intrinsic) to Eigen format
-        K = Eigen::Matrix3d::Zero();
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
-                K(i, j) = msg->k[i*3 + j];
-            }
-        }
-        
-        // Convert R (rectification) to Eigen format
-        R = Eigen::Matrix3d::Zero();
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
-                R(i, j) = msg->r[i*3 + j];
-            }
-        }
-        
-        // Convert P (projection) to Eigen format
-        P = Eigen::Matrix<double, 3, 4>::Zero();
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 4; j++) {
-                P(i, j) = msg->p[i*4 + j];
-            }
-        }
-        
-        fx = K(0, 0);
-        fy = K(1, 1);
-        cx = K(0, 2);
-        cy = K(1, 2);
-    }
+    // Get camera info from ROS message
+    void fromMsg(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& msg);
     
     // Check if the camera info is valid
-    bool isValid() const {
-        return fx > 0 && fy > 0 && width > 0 && height > 0;
-    }
+    bool isValid() const;
+
+    // Calculate undistorted camera parameters
+    void calculate_undistorted_params(int resized_width = 0, int resized_height = 0);
+
+    // Project 3D point to 2D pixel coordinates
+    bool point2pixel_undistorted(const Eigen::Vector3d& point, int& u, int& v) const;
 };
 
 
@@ -112,7 +88,7 @@ private:
 
     // QoS settings
     rclcpp::QoS qos_;
-    
+
     // Synchronization
     typedef message_filters::sync_policies::ApproximateTime<
         sensor_msgs::msg::Image,
@@ -127,15 +103,32 @@ private:
     Ort::Env env_;
     Ort::SessionOptions session_options_;
     std::unique_ptr<Ort::Session> session_;
+    Ort::MemoryInfo memory_info_{nullptr};
+
+    // Store model metadata
+    std::vector<std::string> input_names_;
+    std::vector<std::string> output_names_;
+    std::vector<int64_t> input_shape_;
+
+    // Transform variables
+    Eigen::Isometry3d lidar_to_camera_tf_;
+
+    // Image and point cloud data
+    cv::Mat image_;
+    using InputPointType = pcl::PointXYZ; 
+    using OutputPointType = pcl::PointXYZRGB;
+    pcl::PointCloud<InputPointType>::Ptr point_cloud_;
+    pcl::PointCloud<OutputPointType>::Ptr segmented_point_cloud_;
 
     // Functions
+    void initialize_onnx_session();
     void camera_info_callback(const sensor_msgs::msg::CameraInfo::ConstSharedPtr msg);
     void synchronized_callback(
         const sensor_msgs::msg::Image::ConstSharedPtr& image_msg,
         const sensor_msgs::msg::PointCloud2::ConstSharedPtr& cloud_msg);
-        
+    cv::Mat run_segmentaion(const cv::Mat& image);
     bool get_transform(const std::string& target_frame, const std::string& source_frame, 
                       Eigen::Isometry3d& transform);
-    void preprocess_image(const sensor_msgs::msg::Image::SharedPtr &image_msg);
+    void preprocess_image(const sensor_msgs::msg::Image::ConstSharedPtr &image_msg);
     void postprocess_output();
 };
