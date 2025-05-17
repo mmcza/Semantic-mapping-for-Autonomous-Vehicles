@@ -277,7 +277,7 @@ void SegmentationNode::preprocess_image(
 
     // Resize image to model input size
     cv::Mat resized_image;
-    cv::resize(undistored_image, resized_image, cv::Size(input_shape_[3], input_shape_[2]));
+    cv::resize(undistorted_image, resized_image, cv::Size(input_shape_[3], input_shape_[2]));
 
     // Normalize image with mean and std values from Imagenet
     cv::Mat float_image;
