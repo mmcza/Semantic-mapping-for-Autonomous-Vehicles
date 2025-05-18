@@ -77,6 +77,7 @@ RUN apt-get update && apt-get install -y \
     ros-humble-pcl-conversions \
     ros-humble-pcl-ros \
     ros-humble-ros-core \
+    nlohmann-json3-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

@@ -16,6 +16,8 @@ SegmentationNode::SegmentationNode()
     declare_parameter("lidar_pointcloud_topic", "/sensing/lidar/top/pointcloud");
     declare_parameter("segmented_pointcloud_topic", "/sensing/lidar/segmented_pointcloud");
     declare_parameter("model_path", "/root/Shared/saved_models/model.onnx");
+    declare_parameter("classes_with_colors", R"({"0": ["background", [0, 0, 0]]})");
+    declare_parameter("thread_count", 4);
     
     // Get parameters
     camera_frame_ = get_parameter("camera_frame").as_string();
@@ -25,6 +27,22 @@ SegmentationNode::SegmentationNode()
     lidar_pointcloud_topic_ = get_parameter("lidar_pointcloud_topic").as_string();
     output_topic_ = get_parameter("segmented_pointcloud_topic").as_string();
     model_path_ = get_parameter("model_path").as_string();
+    int thread_count = get_parameter("thread_count").as_int();
+    // Get the max number of threads using OMP
+    int max_threads = omp_get_max_threads();
+    if (thread_count > max_threads) {
+        RCLCPP_WARN(get_logger(), "Requested thread count (%d) exceeds max threads (%d). Using max threads.", thread_count, max_threads);
+        thread_count = max_threads;
+    } else if (thread_count <= 0) {
+        RCLCPP_WARN(get_logger(), "Requested thread count (%d) is invalid. Using default value of 1.", thread_count);
+        thread_count = 1;
+    }
+    omp_set_num_threads(thread_count);
+    RCLCPP_INFO(get_logger(), "%sUsing %d threads for processing%s", GREEN, thread_count, RESET);
+    
+    std::string classes_with_colors_json = get_parameter("classes_with_colors").as_string();
+    classes_with_colors_.fromJSON(classes_with_colors_json);
+    RCLCPP_INFO(get_logger(), "%sClasses with colors parsed successfully from JSON%s", GREEN, RESET);
 
     RCLCPP_INFO(get_logger(), "Model path: %s", model_path_.c_str());
     RCLCPP_INFO(get_logger(), "Camera frame: %s", camera_frame_.c_str());
@@ -124,6 +142,11 @@ void SegmentationNode::initialize_onnx_session()
             Ort::TypeInfo type_info = session_->GetInputTypeInfo(i);
             auto tensor_info = type_info.GetTensorTypeAndShapeInfo();
             input_shape_ = tensor_info.GetShape();
+
+            // Fix for dynamic batch size
+            if (input_shape_.size() > 0 && input_shape_[0] == -1) {
+                input_shape_[0] = 1;
+            }
             
             RCLCPP_INFO(get_logger(), "Input %zu: %s, shape: [%s]", 
                         i, input_names_[i].c_str(),
@@ -202,6 +225,9 @@ void SegmentationNode::synchronized_callback(
     const sensor_msgs::msg::Image::ConstSharedPtr& image_msg,
     const sensor_msgs::msg::PointCloud2::ConstSharedPtr& cloud_msg)
 {
+    // Start timer
+    auto start_time = std::chrono::high_resolution_clock::now();
+
     // Preprocess image
     preprocess_image(image_msg);
 
@@ -218,6 +244,14 @@ void SegmentationNode::synchronized_callback(
     // Get the transformation from lidar to camera frame
     get_transform(lidar_frame_, camera_frame_, lidar_to_camera_tf_);
 
+    // Run segmentation
+    run_segmentaion();
+
+    // Calculate duration
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    auto fps = 1000.0 / duration.count();
+    RCLCPP_INFO(get_logger(), "Processing time: %ld ms (%.2f fps)", duration.count(), fps);
 }
 
 bool SegmentationNode::get_transform(
@@ -281,19 +315,163 @@ void SegmentationNode::preprocess_image(
 
     // Normalize image with mean and std values from Imagenet
     cv::Mat float_image;
-    rgb_image.convertTo(float_image, CV_32F, 1.0 / 255.0);
+    resized_image.convertTo(float_image, CV_32F, 1.0 / 255.0);
 
     std::vector<cv::Mat> channels(3);
     cv::split(float_image, channels);
     channels[0] = (channels[0] - 0.485) / 0.229;  // R channel
     channels[1] = (channels[1] - 0.456) / 0.224;  // G channel
     channels[2] = (channels[2] - 0.406) / 0.225;  // B channel
-    cv::merge(channels, image_);
+    cv::Mat normalized_image;
+    cv::merge(channels, normalized_image);
+
+    // HWC to NCHW conversion
+    int batch = input_shape_[0];
+    int channel = input_shape_[1];
+    int height = input_shape_[2];
+    int width = input_shape_[3];
+
+    // Create a vector with proper size for the NCHW data
+    std::vector<float> input_tensor_values(batch * channel * height * width);
+
+    // Transpose the image from HWC to NCHW format
+    for (int c = 0; c < channel; ++c) {
+        cv::Mat channel_mat;
+        cv::extractChannel(normalized_image, channel_mat, c);
+        
+        std::memcpy(
+            input_tensor_values.data() + c * height * width,
+            channel_mat.data,
+            height * width * sizeof(float)
+        );
+    }
+    image_ = cv::Mat(1, input_tensor_values.size(), CV_32F, input_tensor_values.data()).clone();
 }
 
-void SegmentationNode::postprocess_output()
+void SegmentationNode::run_segmentaion()
 {
-    // TODO: Implement output postprocessing
+    // Prepare input tensor
+    std::vector<float> input_tensor_values(image_.total());
+    std::memcpy(input_tensor_values.data(), image_.data, image_.total() * sizeof(float));
+
+    // Create input tensor
+    Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
+        memory_info_, input_tensor_values.data(), input_tensor_values.size(), 
+        input_shape_.data(), input_shape_.size());
+
+    // Convert C++ strings to C-style strings
+    std::vector<const char*> input_names_raw;
+    std::vector<const char*> output_names_raw;
+    
+    for (const auto& name : input_names_) {
+        input_names_raw.push_back(name.c_str());
+    }
+    
+    for (const auto& name : output_names_) {
+        output_names_raw.push_back(name.c_str());
+    }
+
+    // Run inference with C-style string arrays
+    std::vector<Ort::Value> output_tensors = session_->Run(
+        Ort::RunOptions{nullptr}, 
+        input_names_raw.data(), 
+        &input_tensor, 
+        1, 
+        output_names_raw.data(), 
+        output_names_raw.size());
+
+    // Process output tensors
+    postprocess_output(output_tensors);
+}
+
+void SegmentationNode::postprocess_output(const std::vector<Ort::Value>& output_tensors)
+{
+    if (output_tensors.empty()) {
+        RCLCPP_ERROR(get_logger(), "No output tensors received");
+        return;
+    }
+
+    // Get output tensor info
+    auto tensor_info = output_tensors[0].GetTensorTypeAndShapeInfo();
+    std::vector<int64_t> output_shape = tensor_info.GetShape();
+    int batch = static_cast<int>(output_shape[0]);
+    int num_classes = static_cast<int>(output_shape[1]);
+    int height = static_cast<int>(output_shape[2]);
+    int width = static_cast<int>(output_shape[3]);
+
+    // Get raw output data
+    const float* output_data = output_tensors[0].GetTensorData<float>();
+
+    // Prepare output point cloud
+    segmented_point_cloud_->clear();
+    segmented_point_cloud_->reserve(point_cloud_->size());
+
+    // Process point cloud in parallel
+    #pragma omp parallel
+    {
+        // Create a local segmented point cloud for each thread
+        pcl::PointCloud<OutputPointType> local_segmented_cloud;
+
+        #pragma omp for schedule(dynamic, 1000) nowait
+        for (size_t i = 0; i < point_cloud_->size(); ++i) {
+            // Get point and transform it to camera frame
+            const InputPointType& input_point = point_cloud_->points[i];
+            Eigen::Vector3d point(input_point.x, input_point.y, input_point.z);
+            Eigen::Vector3d transformed_point = lidar_to_camera_tf_ * point;
+
+            // Project point to pixel coordinates
+            int u, v;
+            if (camera_info_.point2pixel_undistorted(transformed_point, u, v)) {
+                // Get class index from output tensor
+                int max_class_idx = 0;
+                float max_score = -std::numeric_limits<float>::max();
+                for (int batch_idx = 0; batch_idx < batch; ++batch_idx) {
+                    for (int class_idx = 0; class_idx < num_classes; ++class_idx) {
+                        int index = (batch_idx * num_classes * height * width) + (class_idx * height * width) + (v * width + u);
+                        float score = output_data[index];
+                        if (score > max_score) {
+                            max_score = score;
+                            max_class_idx = class_idx;
+                        }
+                    }
+                }
+
+                // Create output point and set the color based on class index
+                OutputPointType output_point;
+                output_point.x = input_point.x;
+                output_point.y = input_point.y;
+                output_point.z = input_point.z;
+                output_point.r = classes_with_colors_.colors[max_class_idx][0];
+                output_point.g = classes_with_colors_.colors[max_class_idx][1];
+                output_point.b = classes_with_colors_.colors[max_class_idx][2];
+
+                // Add point to local segmented cloud
+                local_segmented_cloud.push_back(output_point);
+            }
+        }
+        // Merge local segmented clouds into the main point cloud
+        #pragma omp critical
+        {
+            *segmented_point_cloud_ += local_segmented_cloud;
+        }
+    }
+
+    // Set the point cloud metadata
+    segmented_point_cloud_->width = static_cast<uint32_t>(segmented_point_cloud_->size());
+    segmented_point_cloud_->height = 1;
+    segmented_point_cloud_->is_dense = false;
+
+    // Set the point cloud message
+    segmented_point_cloud_msg_ = std::make_shared<sensor_msgs::msg::PointCloud2>();
+    pcl::toROSMsg(*segmented_point_cloud_, *segmented_point_cloud_msg_);
+    segmented_point_cloud_msg_->header.frame_id = lidar_frame_;
+    segmented_point_cloud_msg_->header.stamp = this->now();
+    segmented_point_cloud_msg_->is_dense = false;
+    segmented_point_cloud_msg_->height = 1;
+    segmented_point_cloud_msg_->width = segmented_point_cloud_->width;
+
+    // Publish the segmented point cloud
+    segmented_point_cloud_pub_->publish(*segmented_point_cloud_msg_);
 }
 
 void CameraInfo::fromMsg(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& msg){
@@ -401,6 +579,63 @@ bool CameraInfo::point2pixel_undistorted(const Eigen::Vector3d& point, int& u, i
     
     // Check if pixel is within image bounds
     return (u >= 0 && u < undistorted_width && v >= 0 && v < undistorted_height);
+}
+
+void ClassesWithColors::fromJSON(const std::string& json_string) {
+    try {
+        // Clear existing data
+        names.clear();
+        colors.clear();
+
+        // Parse JSON
+        nlohmann::json j = nlohmann::json::parse(json_string);
+
+        // Determine the maximum class index to size vectors correctly
+        int max_class_idx = -1;
+        for (auto& [key, value] : j.items()) {
+            try {
+                int class_idx = std::stoi(key);
+                max_class_idx = std::max(max_class_idx, class_idx);
+            } catch (const std::exception& e) {
+                throw std::runtime_error("Invalid class index: " + key);
+            }
+        }
+        names.resize(max_class_idx + 1);
+        colors.resize(max_class_idx + 1);
+
+        // Fill vectors with class information
+        for (auto& [key, value] : j.items()) {
+            int class_idx = std::stoi(key);
+            
+            // Validate JSON structure
+            if (!value.is_array() || value.size() != 2 || 
+                !value[0].is_string() || !value[1].is_array() || value[1].size() != 3) {
+                throw std::runtime_error("Invalid format for class " + key);
+            }
+            
+            // Get class name and color
+            std::string class_name = value[0];
+            std::vector<int> class_color = {
+                value[1][0].get<int>(),
+                value[1][1].get<int>(),
+                value[1][2].get<int>()
+            };
+            
+            // Store in vectors at the correct index
+            names[class_idx] = class_name;
+            colors[class_idx] = class_color;
+        }
+
+        // Validate that all classes have been defined
+        for (size_t i = 0; i < names.size(); ++i) {
+            if (names[i].empty()) {
+                throw std::runtime_error("Class index " + std::to_string(i) + " not defined in JSON");
+            }
+        }
+
+    } catch (const nlohmann::json::exception& e) {
+        throw std::runtime_error("JSON parsing error: " + std::string(e.what()));
+    }
 }
 
 int main(int argc, char * argv[])

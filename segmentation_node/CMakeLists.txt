@@ -27,6 +27,8 @@ find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(pcl_ros REQUIRED)
+find_package(nlohmann_json REQUIRED)
+find_package(OpenMP REQUIRED)
 
 # Find ONNX Runtime
 find_path(ONNXRUNTIME_INCLUDE_DIRS
@@ -60,6 +62,12 @@ add_executable(segmentation_node
   src/segmentation_node.cpp
 )
 
+# Set OpenMP flags
+if (OpenMP_FOUND)
+    target_link_libraries(segmentation_node OpenMP::OpenMP_CXX)
+    target_compile_options(segmentation_node PRIVATE ${OpenMP_CXX_FLAGS})
+endif()
+
 ament_target_dependencies(segmentation_node
   rclcpp
   sensor_msgs
@@ -70,6 +78,7 @@ ament_target_dependencies(segmentation_node
   cv_bridge
   pcl_conversions
   pcl_ros
+  nlohmann_json
 )
 
 # Add include directories
@@ -86,6 +95,7 @@ target_link_libraries(segmentation_node
   ${PCL_LIBRARIES}
   ${OpenCV_LIBS}
   Eigen3::Eigen
+  nlohmann_json::nlohmann_json
 )
 
 # Install the executable
