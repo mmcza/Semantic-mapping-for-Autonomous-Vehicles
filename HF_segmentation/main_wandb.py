@@ -1,3 +1,4 @@
+
 import os
 import random
 import time
@@ -14,7 +15,6 @@ import segmentation_models_pytorch as smp
 from segmentation_models_pytorch.losses import DiceLoss, FocalLoss
 from torchmetrics.classification import MulticlassJaccardIndex, MulticlassF1Score
 
-
 # CONFIG
 wandb.login(key = 'key')
 IMAGE_DIR = "/images"
@@ -24,12 +24,12 @@ NUM_CLASSES = 19
 BATCH_SIZE = 4
 NUM_EPOCHS = 3
 LEARNING_RATE = 1e-3
-SEED = 25
-model_type_smp = "DL3PLUS"  #  "DL3PLUS" / "FPN" / "UNET"  (defult)
-ENCODER_NAME = "efficientnet-b1"
+SEED = 1234
+model_type_smp = "DL3PLUS"
+ENCODER_NAME = "efficientnet-b2"
 ENCODER_WEIGHTS = "imagenet"
 WANDB_PROJECT = "seg_sem_veh_b5"
-APPENDIX_COMMENT = "-VAL_34"
+APPENDIX_COMMENT = "-VAL_OK"
 WANDB_RUN_NAME = model_type_smp + ENCODER_NAME + APPENDIX_COMMENT
 VAL_TS = "images_2025_04_14-17_59_20"
 TEST_TS = "images_2025_04_14-18_02_03"
@@ -55,24 +55,22 @@ CLASS_WEIGHTS = {
     15:15.26,16:8.34,17:14.28,18:2.98
 }
 
-# HELPERS
 def color_to_index_mask(mask_img, cmap):
     arr = np.array(mask_img.convert("RGB"))
     idx = np.zeros(arr.shape[:2], dtype=np.int64)
     for i in range(arr.shape[0]):
         for j in range(arr.shape[1]):
-            idx[i,j] = cmap.get(tuple(arr[i,j]),0)
+            idx[i, j] = cmap.get(tuple(arr[i, j]), 0)
     return idx
 
 def index_to_color_mask(idx_mask, cmap):
-    rev = {v:k for k,v in cmap.items()}
-    h,w = idx_mask.shape
-    arr = np.zeros((h,w,3), dtype=np.uint8)
-    for c,col in rev.items():
-        arr[idx_mask==c] = col
+    rev = {v: k for k, v in cmap.items()}
+    h, w = idx_mask.shape
+    arr = np.zeros((h, w, 3), dtype=np.uint8)
+    for c, col in rev.items():
+        arr[idx_mask == c] = col
     return Image.fromarray(arr)
 
-# DATALOADERS
 class SegmentationDataset(Dataset):
     def __init__(self, imgs, msks, size, cmap, tfm=None):
         self.imgs = imgs
@@ -96,11 +94,7 @@ transform = transforms.Compose([
     transforms.Normalize(mean=[0.485,0.456,0.406], std=[0.229,0.224,0.225])
 ])
 
-all_imgs = [
-    os.path.join(IMAGE_DIR, f)
-    for f in os.listdir(IMAGE_DIR)
-    if f.endswith(".png")
-]
+all_imgs = [os.path.join(IMAGE_DIR, f) for f in os.listdir(IMAGE_DIR) if f.endswith(".png")]
 
 def get_ts(path):
     return os.path.basename(path).split("__")[0]
@@ -109,7 +103,6 @@ groups = {}
 for img in all_imgs:
     ts = get_ts(img)
     groups.setdefault(ts, []).append(img)
-
 
 train_imgs, val_imgs, test_imgs = [], [], []
 for ts, imgs in groups.items():
@@ -120,18 +113,9 @@ for ts, imgs in groups.items():
     else:
         train_imgs.extend(imgs)
 
-train_msks = [
-    os.path.join(MASK_DIR, os.path.basename(img).replace(".png","_segmented_mask.png"))
-    for img in train_imgs
-]
-val_msks = [
-    os.path.join(MASK_DIR, os.path.basename(img).replace(".png","_segmented_mask.png"))
-    for img in val_imgs
-]
-test_msks = [
-    os.path.join(MASK_DIR, os.path.basename(img).replace(".png","_segmented_mask.png"))
-    for img in test_imgs
-]
+train_msks = [os.path.join(MASK_DIR, os.path.basename(img).replace(".png","_segmented_mask.png")) for img in train_imgs]
+val_msks   = [os.path.join(MASK_DIR, os.path.basename(img).replace(".png","_segmented_mask.png")) for img in val_imgs]
+test_msks  = [os.path.join(MASK_DIR, os.path.basename(img).replace(".png","_segmented_mask.png")) for img in test_imgs]
 
 train_ds = SegmentationDataset(train_imgs, train_msks, IMAGE_SIZE, COLOR_MAP, transform)
 val_ds   = SegmentationDataset(val_imgs,   val_msks,   IMAGE_SIZE, COLOR_MAP, transform)
@@ -141,43 +125,24 @@ train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,  num_wo
 val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True)
 test_loader  = DataLoader(test_ds,  batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True)
 
-
-#MODELS
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if model_type_smp == "FPN":
-    model = smp.FPN(
-        encoder_name=ENCODER_NAME,
-        encoder_weights=ENCODER_WEIGHTS,
-        in_channels=3,
-        classes=NUM_CLASSES
-    ).to(device)
+    model = smp.FPN(encoder_name=ENCODER_NAME, encoder_weights=ENCODER_WEIGHTS, in_channels=3, classes=NUM_CLASSES).to(device)
 elif model_type_smp == "DL3PLUS":
-    model = smp.DeepLabV3Plus(
-        encoder_name=ENCODER_NAME,
-        encoder_weights=ENCODER_WEIGHTS,
-        in_channels=3,
-        classes=NUM_CLASSES
-    ).to(device)
+    model = smp.DeepLabV3Plus(encoder_name=ENCODER_NAME, encoder_weights=ENCODER_WEIGHTS, in_channels=3, classes=NUM_CLASSES).to(device)
 else:
-    model = smp.Unet(
-        encoder_name=ENCODER_NAME,
-        encoder_weights=ENCODER_WEIGHTS,
-        in_channels=3,
-        classes=NUM_CLASSES
-    ).to(device)
+    model = smp.Unet(encoder_name=ENCODER_NAME, encoder_weights=ENCODER_WEIGHTS, in_channels=3, classes=NUM_CLASSES).to(device)
 
-# LOSS / METRICS
 weights = torch.tensor([CLASS_WEIGHTS[i] for i in range(NUM_CLASSES)], dtype=torch.float32).to(device)
 ce_loss_fn    = CrossEntropyLoss(weight=weights)
 dice_loss_fn  = DiceLoss(mode="multiclass")
 focal_loss_fn = FocalLoss(mode="multiclass", alpha=0.25)
 optimizer     = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+scheduler     = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, verbose=True)
 iou_metric    = MulticlassJaccardIndex(num_classes=NUM_CLASSES).to(device)
 fscore_metric = MulticlassF1Score(num_classes=NUM_CLASSES).to(device)
 
-
-# WANDB SETUP
 wandb.init(
     project=WANDB_PROJECT,
     name=WANDB_RUN_NAME,
@@ -187,17 +152,30 @@ wandb.init(
         "batch_size": BATCH_SIZE,
         "num_epochs": NUM_EPOCHS,
         "num_classes": NUM_CLASSES,
-        "image_size " : IMAGE_SIZE,
+        "image_size": IMAGE_SIZE,
         "validation_video": VAL_TS,
-        "test_video" : TEST_TS
+        "test_video": TEST_TS
     }
 )
 
+wandb.define_metric("train_step")
+wandb.define_metric("val_step")
+wandb.define_metric("train_epoch")
+wandb.define_metric("val_epoch")
+wandb.define_metric("train/batch_*", step_metric="train_step")
+wandb.define_metric("val/batch_*",   step_metric="val_step")
+wandb.define_metric("train/epoch_*", step_metric="train_epoch")
+wandb.define_metric("val/epoch_*",   step_metric="val_epoch")
+
 viz_indices = random.sample(range(len(val_ds)), k=5)
-global_step = 0
-best_val = float("inf")
+viz_fns = [os.path.basename(val_ds.imgs[i]) for i in viz_indices]
+train_step = 0
+val_step   = 0
+train_epoch = 0
+val_epoch   = 0
+best_val   = float("inf")
 single_logged = False
-# TRAINING LOOP
+
 for epoch in range(NUM_EPOCHS):
     model.train()
     train_loss = train_ce = train_dice = train_focal = 0.0
@@ -213,7 +191,6 @@ for epoch in range(NUM_EPOCHS):
         loss  = ce + dloss + floss
         loss.backward()
         optimizer.step()
-
         preds = out.argmax(1)
         biou  = iou_metric(preds, msks_b).item()
         bf    = fscore_metric(preds, msks_b).item()
@@ -225,38 +202,40 @@ for epoch in range(NUM_EPOCHS):
         train_iou_total += biou
         train_f_total   += bf
 
+        train_step += 1
         wandb.log({
+            "train_step":        train_step,
             "train/batch_loss":  loss.item(),
             "train/batch_ce":    ce.item(),
-            "train/batch_dice":  dloss.item(),
+            "train/batch_dice":  1.0 - dloss.item(),
             "train/batch_focal": floss.item(),
             "train/batch_iou":   biou,
             "train/batch_fscore":bf
         })
-        global_step += 1
 
+    train_epoch += 1
     wandb.log({
-        "train/epoch_loss":  train_loss / len(train_loader),
-        "train/epoch_ce":    train_ce   / len(train_loader),
-        "train/epoch_dice":  train_dice / len(train_loader),
-        "train/epoch_focal": train_focal/ len(train_loader),
-        "train/epoch_iou":   train_iou_total / len(train_loader),
-        "train/epoch_fscore":train_f_total   / len(train_loader)
+        "train_epoch":        train_epoch,
+        "train/epoch_loss":   train_loss / len(train_loader),
+        "train/epoch_ce":     train_ce   / len(train_loader),
+        "train/epoch_dice":   1.0 - (train_dice / len(train_loader)),
+        "train/epoch_focal":  train_focal/ len(train_loader),
+        "train/epoch_iou":    train_iou_total / len(train_loader),
+        "train/epoch_fscore": train_f_total   / len(train_loader)
     })
 
     model.eval()
     val_loss = val_ce = val_dice = val_focal = 0.0
     val_iou_total = val_f_total = 0.0
-    batch_start = 0
 
     with torch.no_grad():
         for imgs_b, msks_b, fns in val_loader:
             imgs_b, msks_b = imgs_b.to(device), msks_b.to(device)
-
             if not single_logged:
                 t0 = time.time()
                 _ = model(imgs_b[0].unsqueeze(0))
-                if torch.cuda.is_available(): torch.cuda.synchronize()
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
                 wandb.log({"val/single_inference_time": time.time() - t0})
                 single_logged = True
 
@@ -265,7 +244,6 @@ for epoch in range(NUM_EPOCHS):
             dloss = dice_loss_fn(out, msks_b)
             floss = focal_loss_fn(out, msks_b)
             loss  = ce + dloss + floss
-
             preds = out.argmax(1)
             biou  = iou_metric(preds, msks_b).item()
             bf    = fscore_metric(preds, msks_b).item()
@@ -277,50 +255,53 @@ for epoch in range(NUM_EPOCHS):
             val_iou_total += biou
             val_f_total   += bf
 
+            val_step += 1
             wandb.log({
-                "val/batch_loss":  loss.item(),
-                "val/batch_ce":    ce.item(),
-                "val/batch_dice":  dloss.item(),
-                "val/batch_focal": floss.item(),
-                "val/batch_iou":   biou,
-                "val/batch_fscore":bf
-            }, commit=False)
+                "val_step":           val_step,
+                "val/batch_loss":     loss.item(),
+                "val/batch_ce":       ce.item(),
+                "val/batch_dice":     1.0 - dloss.item(),
+                "val/batch_focal":    floss.item(),
+                "val/batch_iou":      biou,
+                "val/batch_fscore":   bf
+            })
 
-            for i in range(imgs_b.size(0)):
-                idx = batch_start + i
-                if idx in viz_indices:
-                    img_np  = imgs_b[i].cpu().permute(1,2,0).numpy() * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406])
-                    img_np  = np.clip(img_np,0,1)
-                    gt_col  = np.array(index_to_color_mask(msks_b[i].cpu().numpy(), COLOR_MAP))/255.0
-                    pd_col  = np.array(index_to_color_mask(preds[i].cpu().numpy(), COLOR_MAP))/255.0
+            for idx, (img_tensor, msk_tensor, fn) in enumerate(zip(imgs_b, msks_b, fns)):
+                if fn in viz_fns:
+                    img_np = img_tensor.cpu().permute(1,2,0).numpy() * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406])
+                    img_np = np.clip(img_np,0,1)
+                    gt_col = np.array(index_to_color_mask(msk_tensor.cpu().numpy(), COLOR_MAP)) / 255.0
+                    pd_col = np.array(index_to_color_mask(preds[idx].cpu().numpy(), COLOR_MAP)) / 255.0
                     wandb.log({
-                        f"img/{epoch}/{fns[i]}":  wandb.Image(img_np),
-                        f"gt/{epoch}/{fns[i]}":   wandb.Image(gt_col),
-                        f"pred/{epoch}/{fns[i]}": wandb.Image(pd_col)
-                    })
-            batch_start += imgs_b.size(0)
+                        f"img/{epoch}/{fn}":  wandb.Image(img_np),
+                        f"gt/{epoch}/{fn}":   wandb.Image(gt_col),
+                        f"pred/{epoch}/{fn}": wandb.Image(pd_col)
+                    }, commit=False)
 
+    val_epoch += 1
     wandb.log({
-        "val/epoch_loss":  val_loss      / len(val_loader),
-        "val/epoch_ce":    val_ce        / len(val_loader),
-        "val/epoch_dice":  val_dice      / len(val_loader),
-        "val/epoch_focal": val_focal     / len(val_loader),
-        "val/epoch_iou":   val_iou_total / len(val_loader),
-        "val/epoch_fscore":val_f_total   / len(val_loader)
+        "val_epoch":          val_epoch,
+        "val/epoch_loss":     val_loss / len(val_loader),
+        "val/epoch_ce":       val_ce   / len(val_loader),
+        "val/epoch_dice":     1.0 - (val_dice / len(val_loader)),
+        "val/epoch_focal":    val_focal/ len(val_loader),
+        "val/epoch_iou":      val_iou_total / len(val_loader),
+        "val/epoch_fscore":   val_f_total   / len(val_loader)
     })
-
     if val_loss < best_val:
         best_val = val_loss
         torch.save(model.state_dict(), "best_model.pth")
         wandb.save("best_model.pth")
+        dummy_input = torch.randn(1, 3, IMAGE_SIZE[1], IMAGE_SIZE[0], device=device)
+        torch.onnx.export(model, dummy_input, "best_model.onnx", input_names=["input"], output_names=["output"], opset_version=11)
+        wandb.save("best_model.onnx")
 
-# SUMARRY
-avg_train = train_loss / len(train_loader)
-avg_val   = val_loss   / len(val_loader)
-wandb.run.summary["best_val_loss"]     = best_val
-wandb.run.summary["final_train_loss"]  = avg_train
-wandb.run.summary["final_val_loss"]    = avg_val
-wandb.finish()
+    scheduler.step(val_loss / len(val_loader))
 
 torch.cuda.empty_cache()
 torch.cuda.reset_peak_memory_stats()
+
+wandb.run.summary["best_val_loss"]    = best_val / len(val_loader)
+wandb.run.summary["final_train_loss"] = train_loss / len(train_loader)
+wandb.run.summary["final_val_loss"]   = val_loss / len(val_loader)
+wandb.finish()
