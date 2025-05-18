@@ -21,6 +21,9 @@
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 
+#include <nlohmann/json.hpp>
+#include <omp.h>
+
 struct CameraInfo {
     // Original camera info parameters
     int height;
@@ -57,6 +60,13 @@ struct CameraInfo {
     bool point2pixel_undistorted(const Eigen::Vector3d& point, int& u, int& v) const;
 };
 
+
+struct ClassesWithColors {
+    std::vector<std::vector<int>> colors;
+    std::vector<std::string> names;
+
+    void fromJSON(const std::string& json_string);
+};
 
 class SegmentationNode : public rclcpp::Node
 {
@@ -119,6 +129,10 @@ private:
     using OutputPointType = pcl::PointXYZRGB;
     pcl::PointCloud<InputPointType>::Ptr point_cloud_;
     pcl::PointCloud<OutputPointType>::Ptr segmented_point_cloud_;
+    sensor_msgs::msg::PointCloud2::SharedPtr segmented_point_cloud_msg_;
+
+    // Classes and colors
+    ClassesWithColors classes_with_colors_;
 
     // Functions
     void initialize_onnx_session();
@@ -126,9 +140,9 @@ private:
     void synchronized_callback(
         const sensor_msgs::msg::Image::ConstSharedPtr& image_msg,
         const sensor_msgs::msg::PointCloud2::ConstSharedPtr& cloud_msg);
-    cv::Mat run_segmentaion(const cv::Mat& image);
+    void run_segmentaion();
     bool get_transform(const std::string& target_frame, const std::string& source_frame, 
                       Eigen::Isometry3d& transform);
     void preprocess_image(const sensor_msgs::msg::Image::ConstSharedPtr &image_msg);
-    void postprocess_output();
+    void postprocess_output(const std::vector<Ort::Value>& output_tensors);
 };
