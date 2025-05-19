@@ -50,12 +50,27 @@ def generate_launch_description():
     declare_classes_with_colors_arg = DeclareLaunchArgument(
         'classes_with_colors',
         default_value='{' \
-                        ' "0": ["background", [0, 0, 0]],' \
-                        ' "1": ["car", [255, 0, 0]],' \
-                        ' "2": ["pedestrian", [0, 255, 0]],' \
-                        ' "3": ["cyclist", [0, 0, 255]]' \
-                        '}',
-        description='JSON string of classes with their corresponding colors in RGB format'
+            ' "0": ["road", [128, 64, 128]],' \
+            ' "1": ["sidewalk", [244, 35, 232]],' \
+            ' "2": ["building", [70, 70, 70]],' \
+            ' "3": ["wall", [102, 102, 156]],' \
+            ' "4": ["fence", [190, 153, 153]],' \
+            ' "5": ["pole", [153, 153, 153]],' \
+            ' "6": ["traffic light", [250, 170, 30]],' \
+            ' "7": ["traffic sign", [220, 220, 0]],' \
+            ' "8": ["vegetation", [107, 142, 35]],' \
+            ' "9": ["terrain", [152, 251, 152]],' \
+            ' "10": ["sky", [70, 130, 180]],' \
+            ' "11": ["person", [220, 20, 60]],' \
+            ' "12": ["rider", [255, 0, 0]],' \
+            ' "13": ["car", [0, 0, 142]],' \
+            ' "14": ["truck", [0, 0, 70]],' \
+            ' "15": ["bus", [0, 60, 100]],' \
+            ' "16": ["train", [0, 80, 100]],' \
+            ' "17": ["motorcycle", [0, 0, 230]],' \
+            ' "18": ["bicycle", [119, 11, 32]]' \
+        '}',
+        description='JSON string of CITY SCAPES classes with their corresponding colors in RGB format'
     )
 
     declare_thread_count_arg = DeclareLaunchArgument(
