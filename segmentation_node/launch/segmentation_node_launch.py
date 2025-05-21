@@ -3,8 +3,47 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from ament_index_python.packages import get_package_share_directory
+from launch.conditions import IfCondition
+import os
 
 def generate_launch_description():
+    package_dir = get_package_share_directory('segmentation_node')
+    rviz_config_path = os.path.join(package_dir, 'rviz', 'segmentation_node.rviz')
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='screen',
+        arguments=['-d', rviz_config_path],
+    )
+
+    declare_use_octomap_arg = DeclareLaunchArgument(
+        'use_octomap',
+        default_value='true',
+        description='Use Octomap server for 3D Mapping [true/false]'
+    )
+    
+    octomap_server_node = Node(
+        package='octomap_server',
+        executable='color_octomap_server_node',
+        name='octomap_server',
+        output='screen',
+        condition=IfCondition(LaunchConfiguration('use_octomap')),
+        remappings=[
+            ('cloud_in', '/sensing/lidar/segmented_pointcloud'),
+        ],
+        parameters=[{
+            'frame_id': 'viewer',
+            'base_frame_id': 'lidar_laser_top_link',
+            'resolution': 0.25,
+            'height_map': False,
+            'filter_ground': False,
+            'latch': False,
+            'color_factor': 1.0,
+        }]
+    )
+
     declare_camera_frame_arg = DeclareLaunchArgument(
         'camera_frame',
         default_value='camera_front_optical_link',
@@ -43,7 +82,7 @@ def generate_launch_description():
     
     declare_model_path_arg = DeclareLaunchArgument(
         'model_path',
-        default_value='/root/Shared/saved_models/model.onnx',
+        default_value='/root/Shared/saved_models/dl3plus_eff_b2_960_608_19C.onnx',
         description='Path to the ONNX segmentation model'
     )
 
@@ -111,5 +150,8 @@ def generate_launch_description():
         declare_model_path_arg,
         declare_classes_with_colors_arg,
         declare_thread_count_arg,
-        segmentation_node
+        segmentation_node,
+        declare_use_octomap_arg,
+        octomap_server_node,
+        rviz_node
     ])

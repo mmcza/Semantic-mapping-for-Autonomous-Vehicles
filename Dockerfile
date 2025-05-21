@@ -81,10 +81,17 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Install octomap_server and octomap rviz plugins
+RUN apt-get update && apt-get install -y \
+    ros-humble-octomap-server \
+    ros-humble-octomap-rviz-plugins \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /root/ros2_ws
 
 # Copy segmentation_node to the workspace
-COPY ./segmentation_node /root/ros2_ws/src/
+COPY ./segmentation_node /root/ros2_ws/src/segmentation_node
 
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && \
     colcon build --symlink-install --packages-select segmentation_node && \

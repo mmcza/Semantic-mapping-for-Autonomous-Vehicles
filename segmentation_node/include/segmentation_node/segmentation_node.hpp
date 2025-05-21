@@ -83,6 +83,7 @@ private:
     std::string lidar_pointcloud_topic_;
     std::string output_topic_;
     std::string model_path_;
+    int thread_count_;
 
     // Camera info and status
     CameraInfo camera_info_;
@@ -98,6 +99,7 @@ private:
 
     // QoS settings
     rclcpp::QoS qos_;
+    rclcpp::QoS publisher_qos_;
 
     // Synchronization
     typedef message_filters::sync_policies::ApproximateTime<
@@ -124,7 +126,7 @@ private:
     Eigen::Isometry3d lidar_to_camera_tf_;
 
     // Image and point cloud data
-    cv::Mat image_;
+    std::vector<float> input_tensor_values_;
     using InputPointType = pcl::PointXYZ; 
     using OutputPointType = pcl::PointXYZRGB;
     pcl::PointCloud<InputPointType>::Ptr point_cloud_;

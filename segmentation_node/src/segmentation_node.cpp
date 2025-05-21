@@ -6,6 +6,7 @@ const char* RESET = "\033[0m";
 SegmentationNode::SegmentationNode() 
     :   Node("segmentation_node"), 
         qos_(10),
+        publisher_qos_(10),
         env_(ORT_LOGGING_LEVEL_WARNING, "segmentation_session")
 {
     // Declare and get parameters
@@ -27,18 +28,18 @@ SegmentationNode::SegmentationNode()
     lidar_pointcloud_topic_ = get_parameter("lidar_pointcloud_topic").as_string();
     output_topic_ = get_parameter("segmented_pointcloud_topic").as_string();
     model_path_ = get_parameter("model_path").as_string();
-    int thread_count = get_parameter("thread_count").as_int();
+    thread_count_ = get_parameter("thread_count").as_int();
     // Get the max number of threads using OMP
     int max_threads = omp_get_max_threads();
-    if (thread_count > max_threads) {
-        RCLCPP_WARN(get_logger(), "Requested thread count (%d) exceeds max threads (%d). Using max threads.", thread_count, max_threads);
-        thread_count = max_threads;
-    } else if (thread_count <= 0) {
-        RCLCPP_WARN(get_logger(), "Requested thread count (%d) is invalid. Using default value of 1.", thread_count);
-        thread_count = 1;
+    if (thread_count_ > max_threads) {
+        RCLCPP_WARN(get_logger(), "Requested thread count (%d) exceeds max threads (%d). Using max threads.", thread_count_, max_threads);
+        thread_count_ = max_threads;
+    } else if (thread_count_ <= 0) {
+        RCLCPP_WARN(get_logger(), "Requested thread count (%d) is invalid. Using default value of 1.", thread_count_);
+        thread_count_ = 1;
     }
-    omp_set_num_threads(thread_count);
-    RCLCPP_INFO(get_logger(), "%sUsing %d threads for processing%s", GREEN, thread_count, RESET);
+    omp_set_num_threads(thread_count_);
+    RCLCPP_INFO(get_logger(), "%sUsing %d threads for processing%s", GREEN, thread_count_, RESET);
     
     std::string classes_with_colors_json = get_parameter("classes_with_colors").as_string();
     classes_with_colors_.fromJSON(classes_with_colors_json);
@@ -56,9 +57,13 @@ SegmentationNode::SegmentationNode()
     qos_.best_effort();
     qos_.durability_volatile();
 
+    // Initialize the publisher for the segmented point cloud
+    publisher_qos_.reliable();
+    publisher_qos_.keep_last(10);
+
     // Initialize the publisher for segmented point cloud
     segmented_point_cloud_pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(
-        output_topic_, qos_);
+        output_topic_, publisher_qos_);
 
     // Initialize the ONNX Runtime session
     initialize_onnx_session();
@@ -71,6 +76,38 @@ SegmentationNode::SegmentationNode()
     // Initialize the point clouds
     point_cloud_ = std::make_shared<pcl::PointCloud<InputPointType>>();
     segmented_point_cloud_ = std::make_shared<pcl::PointCloud<OutputPointType>>();
+
+    // Construct the point cloud message
+    segmented_point_cloud_msg_ = std::make_shared<sensor_msgs::msg::PointCloud2>();
+    segmented_point_cloud_msg_->header.frame_id = lidar_frame_;
+    segmented_point_cloud_msg_->height = 1;
+    segmented_point_cloud_msg_->width = 1;
+    segmented_point_cloud_msg_->is_bigendian = false;
+    segmented_point_cloud_msg_->is_dense = false;
+    segmented_point_cloud_msg_->point_step = sizeof(OutputPointType);
+    segmented_point_cloud_msg_->row_step = sizeof(OutputPointType);
+
+    // Set up the fields (x, y, z, rgb)
+    segmented_point_cloud_msg_->fields.resize(4);
+    segmented_point_cloud_msg_->fields[0].name = "x";
+    segmented_point_cloud_msg_->fields[0].offset = offsetof(OutputPointType, x);
+    segmented_point_cloud_msg_->fields[0].datatype = sensor_msgs::msg::PointField::FLOAT32;
+    segmented_point_cloud_msg_->fields[0].count = 1;
+    
+    segmented_point_cloud_msg_->fields[1].name = "y";
+    segmented_point_cloud_msg_->fields[1].offset = offsetof(OutputPointType, y);
+    segmented_point_cloud_msg_->fields[1].datatype = sensor_msgs::msg::PointField::FLOAT32;
+    segmented_point_cloud_msg_->fields[1].count = 1;
+    
+    segmented_point_cloud_msg_->fields[2].name = "z";
+    segmented_point_cloud_msg_->fields[2].offset = offsetof(OutputPointType, z);
+    segmented_point_cloud_msg_->fields[2].datatype = sensor_msgs::msg::PointField::FLOAT32;
+    segmented_point_cloud_msg_->fields[2].count = 1;
+    
+    segmented_point_cloud_msg_->fields[3].name = "rgb";
+    segmented_point_cloud_msg_->fields[3].offset = offsetof(OutputPointType, rgb);
+    segmented_point_cloud_msg_->fields[3].datatype = sensor_msgs::msg::PointField::FLOAT32;
+    segmented_point_cloud_msg_->fields[3].count = 1;
 
     RCLCPP_INFO(get_logger(), "Waiting for information about camera...");
 }
@@ -235,23 +272,26 @@ void SegmentationNode::synchronized_callback(
     point_cloud_->clear();
     try {
         pcl::fromROSMsg(*cloud_msg, *point_cloud_);
-        RCLCPP_INFO(get_logger(), "Point cloud converted with %zu points", point_cloud_->size());
+        // RCLCPP_INFO(get_logger(), "Point cloud converted with %zu points", point_cloud_->size());
     } catch (const pcl::PCLException& e) {
         RCLCPP_ERROR(get_logger(), "Error converting point cloud: %s", e.what());
         return;
     }
 
     // Get the transformation from lidar to camera frame
-    get_transform(lidar_frame_, camera_frame_, lidar_to_camera_tf_);
+    get_transform(camera_frame_, lidar_frame_, lidar_to_camera_tf_);
+
+    // Set the time stamp for the point cloud
+    segmented_point_cloud_msg_->header.stamp = cloud_msg->header.stamp;
 
     // Run segmentation
     run_segmentaion();
 
     // Calculate duration
     auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    auto fps = 1000.0 / duration.count();
-    RCLCPP_INFO(get_logger(), "Processing time: %ld ms (%.2f fps)", duration.count(), fps);
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    auto fps = 1000000.0 / duration.count();
+    RCLCPP_INFO(get_logger(), "Processing time: %ld us (%.2f fps)", duration.count(), fps);
 }
 
 bool SegmentationNode::get_transform(
@@ -331,8 +371,8 @@ void SegmentationNode::preprocess_image(
     int height = input_shape_[2];
     int width = input_shape_[3];
 
-    // Create a vector with proper size for the NCHW data
-    std::vector<float> input_tensor_values(batch * channel * height * width);
+    // Reuse our persistent buffer
+    input_tensor_values_.resize(batch * channel * height * width);
 
     // Transpose the image from HWC to NCHW format
     for (int c = 0; c < channel; ++c) {
@@ -340,23 +380,18 @@ void SegmentationNode::preprocess_image(
         cv::extractChannel(normalized_image, channel_mat, c);
         
         std::memcpy(
-            input_tensor_values.data() + c * height * width,
+            input_tensor_values_.data() + c * height * width,
             channel_mat.data,
             height * width * sizeof(float)
         );
     }
-    image_ = cv::Mat(1, input_tensor_values.size(), CV_32F, input_tensor_values.data()).clone();
 }
 
 void SegmentationNode::run_segmentaion()
 {
-    // Prepare input tensor
-    std::vector<float> input_tensor_values(image_.total());
-    std::memcpy(input_tensor_values.data(), image_.data, image_.total() * sizeof(float));
-
     // Create input tensor
     Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
-        memory_info_, input_tensor_values.data(), input_tensor_values.size(), 
+        memory_info_, input_tensor_values_.data(), input_tensor_values_.size(), 
         input_shape_.data(), input_shape_.size());
 
     // Convert C++ strings to C-style strings
@@ -386,6 +421,8 @@ void SegmentationNode::run_segmentaion()
 
 void SegmentationNode::postprocess_output(const std::vector<Ort::Value>& output_tensors)
 {
+    // calculate duration
+    auto start_time = std::chrono::high_resolution_clock::now();
     if (output_tensors.empty()) {
         RCLCPP_ERROR(get_logger(), "No output tensors received");
         return;
@@ -402,6 +439,14 @@ void SegmentationNode::postprocess_output(const std::vector<Ort::Value>& output_
     // Get raw output data
     const float* output_data = output_tensors[0].GetTensorData<float>();
 
+    // Thread-local storage for segmented points
+    std::vector<std::vector<OutputPointType>> thread_points(thread_count_);
+    std::vector<int> thread_point_counts(thread_count_, 0);
+    size_t max_points_per_thread = (point_cloud_->size() / thread_count_) + 1;
+    for (int i = 0; i < thread_count_; i++) {
+        thread_points[i].reserve(max_points_per_thread);
+    }
+    
     // Prepare output point cloud
     segmented_point_cloud_->clear();
     segmented_point_cloud_->reserve(point_cloud_->size());
@@ -409,10 +454,9 @@ void SegmentationNode::postprocess_output(const std::vector<Ort::Value>& output_
     // Process point cloud in parallel
     #pragma omp parallel
     {
-        // Create a local segmented point cloud for each thread
-        pcl::PointCloud<OutputPointType> local_segmented_cloud;
-
-        #pragma omp for schedule(dynamic, 1000) nowait
+        int thread_id = omp_get_thread_num();
+        
+        #pragma omp for schedule(dynamic, 32)
         for (size_t i = 0; i < point_cloud_->size(); ++i) {
             // Get point and transform it to camera frame
             const InputPointType& input_point = point_cloud_->points[i];
@@ -427,10 +471,11 @@ void SegmentationNode::postprocess_output(const std::vector<Ort::Value>& output_
                 float max_score = -std::numeric_limits<float>::max();
                 for (int batch_idx = 0; batch_idx < batch; ++batch_idx) {
                     for (int class_idx = 0; class_idx < num_classes; ++class_idx) {
-                        int index = (batch_idx * num_classes * height * width) + (class_idx * height * width) + (v * width + u);
-                        float score = output_data[index];
-                        if (score > max_score) {
-                            max_score = score;
+                        const float* class_scores = &output_data[(batch_idx * num_classes * height * width) + 
+                                                                (class_idx * height * width) + 
+                                                                (v * width + u)];
+                        if (*class_scores > max_score) {
+                            max_score = *class_scores;
                             max_class_idx = class_idx;
                         }
                     }
@@ -441,37 +486,67 @@ void SegmentationNode::postprocess_output(const std::vector<Ort::Value>& output_
                 output_point.x = input_point.x;
                 output_point.y = input_point.y;
                 output_point.z = input_point.z;
-                output_point.r = classes_with_colors_.colors[max_class_idx][0];
-                output_point.g = classes_with_colors_.colors[max_class_idx][1];
-                output_point.b = classes_with_colors_.colors[max_class_idx][2];
+                uint32_t rgb = ((uint32_t)classes_with_colors_.colors[max_class_idx][0] << 16 | 
+                                (uint32_t)classes_with_colors_.colors[max_class_idx][1] << 8 | 
+                                (uint32_t)classes_with_colors_.colors[max_class_idx][2]);
+                output_point.rgb = *reinterpret_cast<float*>(&rgb);
 
-                // Add point to local segmented cloud
-                local_segmented_cloud.push_back(output_point);
+                // Add point to thread-local vector
+                thread_points[thread_id].push_back(output_point);
+                thread_point_counts[thread_id]++;
             }
-        }
-        // Merge local segmented clouds into the main point cloud
-        #pragma omp critical
-        {
-            *segmented_point_cloud_ += local_segmented_cloud;
         }
     }
 
-    // Set the point cloud metadata
-    segmented_point_cloud_->width = static_cast<uint32_t>(segmented_point_cloud_->size());
-    segmented_point_cloud_->height = 1;
-    segmented_point_cloud_->is_dense = false;
+    // Calculate total points and offsets
+    size_t total_points = 0;
+    std::vector<size_t> thread_offsets(thread_count_);
+    thread_offsets[0] = 0;
+    
+    for (int i = 0; i < thread_count_; i++) {
+        total_points += thread_point_counts[i];
+        if (i > 0) {
+            thread_offsets[i] = thread_offsets[i-1] + thread_point_counts[i-1];
+        }
+    }
+    
+    if (total_points == 0) {
+        RCLCPP_WARN(get_logger(), "No points visible in camera");
+        return;
+    }
 
-    // Set the point cloud message
-    segmented_point_cloud_msg_ = std::make_shared<sensor_msgs::msg::PointCloud2>();
-    pcl::toROSMsg(*segmented_point_cloud_, *segmented_point_cloud_msg_);
-    segmented_point_cloud_msg_->header.frame_id = lidar_frame_;
-    segmented_point_cloud_msg_->header.stamp = this->now();
-    segmented_point_cloud_msg_->is_dense = false;
-    segmented_point_cloud_msg_->height = 1;
-    segmented_point_cloud_msg_->width = segmented_point_cloud_->width;
+    // Directly construct the PointCloud2 message
+    segmented_point_cloud_msg_->width = total_points;
+    segmented_point_cloud_msg_->row_step = sizeof(OutputPointType) * total_points;
 
-    // Publish the segmented point cloud
+    // Allocate memory for point data
+    segmented_point_cloud_msg_->data.resize(segmented_point_cloud_msg_->row_step);
+    
+    // Copy points from thread-local vectors to message in parallel
+    #pragma omp parallel
+    {
+        int thread_id = omp_get_thread_num();
+        size_t start_offset = thread_offsets[thread_id] * sizeof(OutputPointType);
+        size_t points_to_copy = thread_points[thread_id].size();
+        
+        if (points_to_copy > 0) {
+            // Copy all points from this thread at once
+            memcpy(
+                &segmented_point_cloud_msg_->data[start_offset],
+                thread_points[thread_id].data(),
+                points_to_copy * sizeof(OutputPointType)
+            );
+        }
+    }
+
+    // Publish the point cloud
     segmented_point_cloud_pub_->publish(*segmented_point_cloud_msg_);
+    RCLCPP_INFO(get_logger(), "Segmented point cloud published with %zu points", total_points);
+    
+    // Calculate duration
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    RCLCPP_INFO(get_logger(), "Postprocessing time: %ld us", duration.count());
 }
 
 void CameraInfo::fromMsg(const sensor_msgs::msg::CameraInfo::ConstSharedPtr& msg){
