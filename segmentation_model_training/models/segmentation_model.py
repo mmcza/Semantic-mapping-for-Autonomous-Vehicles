@@ -230,21 +230,47 @@ class SegmentationModel(pl.LightningModule):
 
         if self._scheduler_type == "StepLR":
             scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=10, gamma=0.1)
+            scheduler_config = {
+                'scheduler': scheduler,
+                'interval': 'epoch',
+                'frequency': 1,
+            }
         elif self._scheduler_type == "CosineAnnealingLR":
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=10, eta_min=0)
+            scheduler_config = {
+                'scheduler': scheduler,
+                'interval': 'epoch',
+                'frequency': 1,
+            }
         elif self._scheduler_type == "ReduceLROnPlateau":
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=10, verbose=True)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, mode='min', factor=0.1, patience=5, verbose=True)
+            scheduler_config = {
+                'scheduler': scheduler,
+                'monitor': 'val_loss',
+                'interval': 'epoch',
+                'frequency': 1,
+            }
         elif self._scheduler_type == "ExponentialLR":
             scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.9)
+            scheduler_config = {
+                'scheduler': scheduler,
+                'interval': 'epoch',
+                'frequency': 1,
+            }
         elif self._scheduler_type == "CyclicLR":
-            scheduler = torch.optim.lr_scheduler.CyclicLR(self.optimizer, base_lr=self._lr, max_lr=0.01, step_size_up=5, mode='triangular')
+            max_lr = self._lr * 10
+            scheduler = torch.optim.lr_scheduler.CyclicLR(
+                self.optimizer, 
+                base_lr=self._lr, 
+                max_lr=max_lr,
+                step_size_up=100,
+                mode='triangular'
+            )
+            scheduler_config = {
+                'scheduler': scheduler,
+                'interval': 'step',
+                'frequency': 1,
+            }
         else:
             raise ValueError(f"Scheduler type {self._scheduler_type} is not supported.")
-        
-        self.scheduler = {
-            'scheduler': scheduler,
-            'interval': 'step',
-            'frequency': 1,
-        }
-
-        return [self.optimizer], [self.scheduler]
+        return [self.optimizer], [scheduler_config]

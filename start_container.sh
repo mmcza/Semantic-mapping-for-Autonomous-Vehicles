@@ -26,7 +26,6 @@ docker run -it --rm \
 	--env="DISPLAY" \
 	--env="QT_X11_NO_MITSHM=1" \
 	--volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" --privileged \
-	--volume="/home/$user/Semantic-mapping-for-Autonomous-Vehicles:/root/Shared/Semantic-mapping-for-Autonomous-Vehicles:rw" \
     --volume="/home/$user/samochodzik_rosbag:/root/Shared/rosbags:rw" \
 	--volume="./HF_segmentation/ONNX_trained:/root/Shared/saved_models:rw" \
 	--gpus all \

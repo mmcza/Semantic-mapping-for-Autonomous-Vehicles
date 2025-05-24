@@ -17,7 +17,7 @@ SegmentationNode::SegmentationNode()
     declare_parameter("lidar_pointcloud_topic", "/sensing/lidar/top/pointcloud");
     declare_parameter("segmented_pointcloud_topic", "/sensing/lidar/segmented_pointcloud");
     declare_parameter("model_path", "/root/Shared/saved_models/model.onnx");
-    declare_parameter("classes_with_colors", R"({"0": ["background", [0, 0, 0]]})");
+    declare_parameter("classes_with_colors", R"({"0": ["background", [0, 0, 0], true]})");
     declare_parameter("thread_count", 4);
     
     // Get parameters
@@ -432,9 +432,15 @@ void SegmentationNode::postprocess_output(const std::vector<Ort::Value>& output_
     auto tensor_info = output_tensors[0].GetTensorTypeAndShapeInfo();
     std::vector<int64_t> output_shape = tensor_info.GetShape();
     int batch = static_cast<int>(output_shape[0]);
-    int num_classes = static_cast<int>(output_shape[1]);
+    size_t num_classes = static_cast<int>(output_shape[1]);
     int height = static_cast<int>(output_shape[2]);
     int width = static_cast<int>(output_shape[3]);
+
+    // Check if each class has a color defined
+    if (classes_with_colors_.colors.size() < num_classes) {
+        RCLCPP_ERROR(get_logger(), "Not enough colors defined for %ld classes", num_classes);
+        return;
+    }
 
     // Get raw output data
     const float* output_data = output_tensors[0].GetTensorData<float>();
@@ -470,7 +476,7 @@ void SegmentationNode::postprocess_output(const std::vector<Ort::Value>& output_
                 int max_class_idx = 0;
                 float max_score = -std::numeric_limits<float>::max();
                 for (int batch_idx = 0; batch_idx < batch; ++batch_idx) {
-                    for (int class_idx = 0; class_idx < num_classes; ++class_idx) {
+                    for (size_t class_idx = 0; class_idx < num_classes; ++class_idx) {
                         const float* class_scores = &output_data[(batch_idx * num_classes * height * width) + 
                                                                 (class_idx * height * width) + 
                                                                 (v * width + u)];
@@ -479,6 +485,11 @@ void SegmentationNode::postprocess_output(const std::vector<Ort::Value>& output_
                             max_class_idx = class_idx;
                         }
                     }
+                }
+
+                // Check if the class should be visualized
+                if (!classes_with_colors_.visualize[max_class_idx]) {
+                    continue;
                 }
 
                 // Create output point and set the color based on class index
@@ -675,16 +686,18 @@ void ClassesWithColors::fromJSON(const std::string& json_string) {
                 throw std::runtime_error("Invalid class index: " + key);
             }
         }
-        names.resize(max_class_idx + 1);
-        colors.resize(max_class_idx + 1);
+        names.resize(max_class_idx + 1, std::string());
+        colors.resize(max_class_idx + 1, std::vector<int>(3, 0));
+        visualize.resize(max_class_idx + 1, true); // Default to true for all classes
 
         // Fill vectors with class information
         for (auto& [key, value] : j.items()) {
             int class_idx = std::stoi(key);
             
             // Validate JSON structure
-            if (!value.is_array() || value.size() != 2 || 
-                !value[0].is_string() || !value[1].is_array() || value[1].size() != 3) {
+            if (!value.is_array() || value.size() != 3 || 
+                !value[0].is_string() || !value[1].is_array() || value[1].size() != 3 ||
+                !value[2].is_boolean()) {
                 throw std::runtime_error("Invalid format for class " + key);
             }
             
@@ -695,10 +708,12 @@ void ClassesWithColors::fromJSON(const std::string& json_string) {
                 value[1][1].get<int>(),
                 value[1][2].get<int>()
             };
+            bool visualize_class = value[2].get<bool>();
             
             // Store in vectors at the correct index
             names[class_idx] = class_name;
             colors[class_idx] = class_color;
+            visualize[class_idx] = visualize_class;
         }
 
         // Validate that all classes have been defined
