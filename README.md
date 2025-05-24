@@ -60,6 +60,13 @@ The segmentation node allows to remove points belonging to selected classes. Use
 ![Example of filtering](/media/filter_no_filter_comp.png)
 
 ## Segmentation models
+| Model                                        | Input      | Classes | FPS                 |
+|----------------------------------------------|------------|---------|---------------------|
+| DeepLabV3+ (EfficientNet-B0 + SAM2)          | 480 × 304  | 11      |                     |
+| DeepLabV3+ (EfficientNet-B2, 19-class)       | 960 × 608  | 19      |                     | 
+| DeepLabV3+ (MobileNetV2)                     | 960 × 608  | 19      |                     | 
+| LinkNet (MobileNetV2)                        | 960 × 608  | 19      |                     |
+| U-Net (EfficientNet-B2)                      | 960 × 608  | 19      |                     |
 
 ## Tools
 
