@@ -23,6 +23,12 @@ def generate_launch_description():
         default_value='true',
         description='Use Octomap server for 3D Mapping [true/false]'
     )
+
+    declare_octomap_resolution_arg = DeclareLaunchArgument(
+        'octomap_resolution',
+        default_value='0.25',
+        description='Resolution for the Octomap server'
+    )
     
     octomap_server_node = Node(
         package='octomap_server',
@@ -36,7 +42,7 @@ def generate_launch_description():
         parameters=[{
             'frame_id': 'viewer',
             'base_frame_id': 'lidar_laser_top_link',
-            'resolution': 0.25,
+            'resolution': LaunchConfiguration('octomap_resolution'),
             'height_map': False,
             'filter_ground': False,
             'latch': False,
@@ -89,27 +95,27 @@ def generate_launch_description():
     declare_classes_with_colors_arg = DeclareLaunchArgument(
         'classes_with_colors',
         default_value='{' \
-            ' "0": ["road", [128, 64, 128]],' \
-            ' "1": ["sidewalk", [244, 35, 232]],' \
-            ' "2": ["building", [70, 70, 70]],' \
-            ' "3": ["wall", [102, 102, 156]],' \
-            ' "4": ["fence", [190, 153, 153]],' \
-            ' "5": ["pole", [153, 153, 153]],' \
-            ' "6": ["traffic light", [250, 170, 30]],' \
-            ' "7": ["traffic sign", [220, 220, 0]],' \
-            ' "8": ["vegetation", [107, 142, 35]],' \
-            ' "9": ["terrain", [152, 251, 152]],' \
-            ' "10": ["sky", [70, 130, 180]],' \
-            ' "11": ["person", [220, 20, 60]],' \
-            ' "12": ["rider", [255, 0, 0]],' \
-            ' "13": ["car", [0, 0, 142]],' \
-            ' "14": ["truck", [0, 0, 70]],' \
-            ' "15": ["bus", [0, 60, 100]],' \
-            ' "16": ["train", [0, 80, 100]],' \
-            ' "17": ["motorcycle", [0, 0, 230]],' \
-            ' "18": ["bicycle", [119, 11, 32]]' \
+            ' "0": ["road", [128, 64, 128], true],' \
+            ' "1": ["sidewalk", [244, 35, 232], true],' \
+            ' "2": ["building", [70, 70, 70], true],' \
+            ' "3": ["wall", [102, 102, 156], true],' \
+            ' "4": ["fence", [190, 153, 153], true],' \
+            ' "5": ["pole", [153, 153, 153], true],' \
+            ' "6": ["traffic light", [250, 170, 30], true],' \
+            ' "7": ["traffic sign", [220, 220, 0], true],' \
+            ' "8": ["vegetation", [107, 142, 35], true],' \
+            ' "9": ["terrain", [152, 251, 152], true],' \
+            ' "10": ["sky", [70, 130, 180], true],' \
+            ' "11": ["person", [220, 20, 60], true],' \
+            ' "12": ["rider", [255, 0, 0], true],' \
+            ' "13": ["car", [0, 0, 142], true],' \
+            ' "14": ["truck", [0, 0, 70], true],' \
+            ' "15": ["bus", [0, 60, 100], true],' \
+            ' "16": ["train", [0, 80, 100], true],' \
+            ' "17": ["motorcycle", [0, 0, 230], true],' \
+            ' "18": ["bicycle", [119, 11, 32], true]' \
         '}',
-        description='JSON string of CITY SCAPES classes with their corresponding colors in RGB format'
+        description='JSON string of CITY SCAPES classes with their corresponding colors in RGB format and boolean visibility flag'
     )
 
     declare_thread_count_arg = DeclareLaunchArgument(
@@ -150,8 +156,9 @@ def generate_launch_description():
         declare_model_path_arg,
         declare_classes_with_colors_arg,
         declare_thread_count_arg,
-        segmentation_node,
+        declare_octomap_resolution_arg,
         declare_use_octomap_arg,
+        segmentation_node,
         octomap_server_node,
         rviz_node
     ])

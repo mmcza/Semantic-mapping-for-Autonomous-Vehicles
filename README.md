@@ -5,14 +5,15 @@
 - [Semantic mapping for Autonomous Vehicles](#semantic-mapping-for-autonomous-vehicles)
   - [The Docker container](#the-docker-container)
   - [ROS2 Node for mapping with semantic information](#ros2-node-for-mapping-with-semantic-information)
+    - [Class filtering](#class-filtering)
   - [Segmentation models](#segmentation-models)
   - [Tools](#tools)
     - [Get images from rosbags](#get-images-from-rosbags)
-    - [Annotate the data with SAM2](#annotate-the-data-with-sam2)
-      - [Build the Docker](#build-the-docker)
-      - [Use the script to generate masks](#use-the-script-to-generate-masks)
-      - [Use the script to generate masks with batch querying (requires more VRAM)](#use-the-script-to-generate-masks-with-batch-querying-requires-more-vram)
-  - [List of annotated objects:](#list-of-annotated-objects)
+    - [Annotate the data with GroundingDINO and SAM2](#annotate-the-data-with-groundingdino-and-sam2)
+
+![Octomap generation](/media/semantic_octomap_generation.gif)
+
+An example of an Octomap created with the additional semantic information. The recording was sped up 10x to show the complete mapping process.
 
 ## The Docker container
 
@@ -35,6 +36,8 @@ bash start_container.sh
 
 ![Semantic map example 2](/media/Semantic_mapping_example2.png)
 
+An additional semantic information can be valuable in multiple robotic tasks, particularly in navigation and path planning. For example, it enables intelligent path cost assignment based on terrain type (allowing robots to favor asphalt over slippery or muddy surfaces for safer, faster travel), and distinguishing between static and dynamic obstacles, a knowledge that is useful in planning avoidance strategies.
+
 To start the ROS2 node that runs segmentation on images from a camera and adjusts color of a pointcloud from LIDAR/depth camera based on the segmentation mask, you can run:
 
 ```
@@ -44,7 +47,17 @@ ros2 launch segmentation_node segmentation_node_launch.py
 >[!NOTE]
 >You can check all available adjustable parameters (topic names, frame ids, not using Octomap, changing number of threads, etc.) by running `ros2 launch segmentation_node segmentation_node_launch.py --show-args`.
 
-The launch file starts the segmentation node that waits for information from topic with camera information, Octomap server and RVIZ for visualition. By default Octomap is not visible in RVIZ due to long time required to update the visualization (the map itself runs fine), but you can enable it at any time. Using default settings, the time required to process a pointcloud with corresponding rgb image is on average around 50 ms (20 fps) on computer with AMD Ryzen 5 5600X with NVidia RTX 4070. Running single-threaded slowed down processing to around 10 fps, while running on all 12 threads led to 25-30 fps.
+![Pointcloud with colors based on semantic segmentation](media/semantic_pointcloud.gif)
+
+The ROS2 node implements a synchronized processing pipeline for semantic mapping. It begins by subscribing to RGB camera images and point cloud data from topics specified as parameters. These images go through preprocessing, including resolution adjustment and normalization using ImageNet weights, before being passed to an ONNX-format segmentation model for inference. Using transformation between the camera and LiDAR frames (obtained from the `/tf` topic), the each 3D point is projected onto the segmentation mask and assigns appropriate semantic colors based on the predicted labels. The resulting point cloud is then published to another topic, where the OctoMap server can subscribe to it and construct a semantic 3D map of the environment.
+
+The launch file starts the segmentation node, Octomap server and RVIZ for visualition. By default Octomap is not visible in RVIZ due to long time required to update the visualization (the map itself runs fine), but you can enable it at any time. Using default settings, the time required to process a pointcloud with corresponding rgb image is on average around 50 ms (20 fps) on computer with AMD Ryzen 5 5600X, 32GB of RAM and NVidia RTX 4070. Running single-threaded slowed down processing to around 10 fps, while running on all 12 threads led to 25-30 fps.
+
+### Class filtering
+
+The segmentation node allows to remove points belonging to selected classes. Users can configure which classes are visible by adjusting the `classes_with_colors` parameter in JSON format, where the boolean value (`true` or `false`) determines whether points from that class are included in the final point cloud visualization. This can be useful to create a general map of the environment, where all movable objects are removed (e.g. cars/people from a road or parking lot). The other usage can be creation of a 3D model of a specific object that is a target of a robot (e.g. a cup on a desk). 
+
+![Example of filtering](/media/filter_no_filter_comp.png)
 
 ## Segmentation models
 
@@ -66,61 +79,6 @@ python3 ros2_bag_to_png.py --bagfile ~/Shared/rosbags/rosbag2_2025_04_14-17_54_1
 >[!NOTE]
 >Inside the script the distortion parameters are defined. You can adjust them to work with your camera. You can find the parameters in appropriate ROS2 topic.
 
-### Annotate the data with SAM2
+### Annotate the data with GroundingDINO and SAM2
 
-#### Build the Docker
-
-For annotations with SAM2 a separate Dockerfile is prepared (it's done because of the size of the image, and majority is not necessary for the ROS2 image). Go into `/utils/segmentation_with_sam` and run:
-```
-docker build -t sam_annotations .
-```
-Then you can start the container with the script available inside `/utils/segmentation_with_sam`:
-```
-bash start_container.sh
-```
->[!NOTE]
-> You can adjust the paths to directory with images for annotation.
-
-> [!NOTE]  
-> Based on https://github.com/luca-medeiros/lang-segment-anything
-
-#### Use the script to generate masks
-
-To use SAM2 to create masks on the images use:
-```
-python3 generate_masks_for_training.py --input_dir <path to directory with images> --output_dir <path to save the annotations> --model <name of model> --save_visualizations --min_area <minimal size>
-```
-Models to choose: `"sam2.1_hiera_tiny", "sam2.1_hiera_small", "sam2.1_hiera_base_plus", "sam2.1_hiera_large"`
-
-Example:
-```
-python3 generate_masks_for_training.py --input_dir ~/Shared/rosbag2_2025_04_14-17_54_17/ --output_dir ~/Shared/annotations --model sam2.1_hiera_large --save_visualizations --min_area 600
-```
-
-#### Use the script to generate masks with batch querying (requires more VRAM)
-
-To use SAM2 to create masks on the images, and query 5 classes at the same time, use:
-```
-python3 generate_masks_for_training_with_batch_queries.py --input_dir <path to directory with images> --output_dir <path to save the annotations> --model <name of model> --save_visualizations --min_area <minimal size>
-```
-Models to choose: `"sam2.1_hiera_tiny", "sam2.1_hiera_small", "sam2.1_hiera_base_plus", "sam2.1_hiera_large"`
-
-Example:
-```
-python3 generate_masks_for_training_with_batch_queries.py --input_dir ~/Shared/rosbag2_2025_04_14-17_54_17/ --output_dir ~/Shared/annotations --model sam2.1_hiera_large --save_visualizations --min_area 600
-```
->[!WARNING]
-> Model `sam2.1_hiera_large` requires ~11GB VRAM when running with batches,  and time gain is marginal.
-
-## List of annotated objects:
-- `1`: `Other` (doesn't fit any of the other classes listed below);
-- `2`: `Sky`;
-- `3`: `Building`;
-- `4`: `Grass`;
-- `5`: `Sand`, `Mud`;
-- `6`: `Road`, `Asphalt`, `Cobblestone`;
-- `7`: `Fence`;
-- `8`: `Tree`;
-- `9`: `Sign`, `Lamp`, `Pole`, `Cone`, `Bike`;
-- `10`: `Car`, `Truck`;
-- `11`: `Person`.
+A whole pipeline to automatically annotate images is available inside [segmentation_with_sam directory](/utils/segmentation_with_sam/).

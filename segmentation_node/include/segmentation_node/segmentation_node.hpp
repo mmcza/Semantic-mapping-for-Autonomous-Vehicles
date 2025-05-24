@@ -60,10 +60,10 @@ struct CameraInfo {
     bool point2pixel_undistorted(const Eigen::Vector3d& point, int& u, int& v) const;
 };
 
-
 struct ClassesWithColors {
     std::vector<std::vector<int>> colors;
     std::vector<std::string> names;
+    std::vector<bool> visualize;
 
     void fromJSON(const std::string& json_string);
 };
