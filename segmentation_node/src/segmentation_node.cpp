@@ -503,7 +503,8 @@ void SegmentationNode::postprocess_output(const std::vector<Ort::Value>& output_
                 output_point.rgb = *reinterpret_cast<float*>(&rgb);
 
                 // Add point to thread-local vector
-                thread_points[thread_id].push_back(output_point);
+                size_t point_index = thread_point_counts[thread_id];
+                thread_points[thread_id][point_index] = output_point;
                 thread_point_counts[thread_id]++;
             }
         }
@@ -648,20 +649,15 @@ void CameraInfo::calculate_undistorted_params(int resized_width, int resized_hei
 }
 
 bool CameraInfo::point2pixel_undistorted(const Eigen::Vector3d& point, int& u, int& v) const {
-    if (!isValid()) {
-        return false;
-    }
-    
-    // Check if point is in front of camera
-    if (point.z() <= 0) {
+    if (!isValid() || point.z() <= 0) {
         return false;
     }
     
     // Project 3D point to 2D image coordinates
-    double x = point.x() / point.z();
-    double y = point.y() / point.z();
-    u = static_cast<int>(std::round(undistorted_fx * x + undistorted_cx));
-    v = static_cast<int>(std::round(undistorted_fy * y + undistorted_cy));
+    const double inv_z = 1.0 / point.z();
+
+    u = static_cast<int>(std::round(undistorted_fx * point.x() * inv_z + undistorted_cx));
+    v = static_cast<int>(std::round(undistorted_fy * point.y() * inv_z + undistorted_cy));
     
     // Check if pixel is within image bounds
     return (u >= 0 && u < undistorted_width && v >= 0 && v < undistorted_height);
