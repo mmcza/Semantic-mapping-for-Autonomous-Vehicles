@@ -125,6 +125,10 @@ SAM2 custom: https://wandb.ai/qbizm/seg_sem_veh1
 
 City scapes: https://wandb.ai/qbizm/seg_sem_veh_b5
 
+![image](https://github.com/user-attachments/assets/a39bc9d9-4850-4c39-bd99-c96cb2b0d434)
+
+
+
 ## Tools
 
 ### Get images from rosbags
