@@ -120,11 +120,6 @@ The segmentation node allows to remove points belonging to selected classes. Use
 
 A tool for interactively browsing raw camera frames and their corresponding `*_segmented_mask.png` overlays. It auto-scans all `images_*` folders under `annotations2/`, pairs masks with their `_image_raw_*.png` counterparts (by suffix after `__`), and displays them vertically. Use “Prev”/“Next” to navigate and “Delete” to move bad pairs into `deleted/`.
 
-## Created datasets links
-SAM2 generated masks: https://www.kaggle.com/datasets/mrj111/sem-seg-veh/data
-
-NVIDIA segformer-b5-finetuned-cityscapes-1024-1024 generated masks: https://www.kaggle.com/datasets/mrj111/sem-seg-veh-b5
-
 ## Wandb Training Logs
 SAM2 custom: https://wandb.ai/qbizm/seg_sem_veh1
 
