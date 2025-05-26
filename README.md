@@ -73,12 +73,12 @@ The segmentation node allows to remove points belonging to selected classes. Use
 | DeepLabV3+ | UNet | FPN |
 |------------|------|-----|
 | ![DeepLabV3+](https://github.com/user-attachments/assets/75b98bd0-054c-430a-8e98-507324070ed3) | ![UNet](https://github.com/user-attachments/assets/ed6f41f7-f5d6-435c-bbe2-0cf491cf7068) | ![FPN](https://github.com/user-attachments/assets/80367716-4132-4dc4-90ba-08df007d0133) |
-| *(DeepLabV3+ citation)* | *([UNet citation](https://arxiv.org/abs/1505.04597))* | *(FPN citation)* |
+| *([DeepLabV3+ citation](https://arxiv.org/abs/1802.02611))* | *([UNet citation](https://arxiv.org/abs/1505.04597))* | *([FPN citation](https://www.mdpi.com/2072-4292/14/9/2012))* |
 
 | SegFormer | LinkNet |  |
 |-----------|---------|--|
 | ![SegFormer](https://github.com/user-attachments/assets/89b29b42-db08-4251-b65a-9bde18db4d1e) | ![LinkNet](https://github.com/user-attachments/assets/abd8ce18-3b97-483d-a396-a918ae449cd0)
-| *(SegFormer citation)* | *(LinkNet citation)* |  |
+| *([SegFormer citation](https://arxiv.org/abs/2105.15203))* | *([LinkNet citation](https://doi.org/10.1007/s00521-019-04546-6))* |  |
 
 
 
