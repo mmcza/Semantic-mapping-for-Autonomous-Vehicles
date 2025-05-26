@@ -115,6 +115,9 @@ The segmentation node allows to remove points belonging to selected classes. Use
 | — | ![#0000E6](https://img.shields.io/badge/-0000E6?style=flat-square&logoColor=white) `17: motorcycle` (0,0,230) |
 | — | ![#770B20](https://img.shields.io/badge/-770B20?style=flat-square&logoColor=white) `18: bicycle` (119,11,32) |
 
+##
+![media](https://github.com/mmcza/Semantic-mapping-for-Autonomous-Vehicles/blob/main/media/viewer.png)
+
 ## Created datasets links
 SAM2 generated masks: https://www.kaggle.com/datasets/mrj111/sem-seg-veh/data
 
