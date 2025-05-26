@@ -18,19 +18,22 @@ An example of an Octomap created with the additional semantic information. The r
 ## The Docker container
 
 To build the docker image (requires around 12.6 GB of space), clone the repository, and once you're inside the directory, use the following command:
+
 ```
 docker build -t semantic-mapping .
 ```
 
 You can start the container by running:
+
 ```
 bash start_container.sh
 ```
->[!NOTE]
->You can adjust the paths to the directory with rosbags and with segmentation model inside the bash script.
 
->[!WARNING]
->By default the docker container is removed after being closed and all data is lost. To avoid that you can remove `--rm` flag, save the data inside shared folders or copy the data from the container to your computer.
+> [!NOTE]
+> You can adjust the paths to the directory with rosbags and with segmentation model inside the bash script.
+
+> [!WARNING]
+> By default the docker container is removed after being closed and all data is lost. To avoid that you can remove `--rm` flag, save the data inside shared folders or copy the data from the container to your computer.
 
 ## ROS2 Node for mapping with semantic information
 
@@ -44,8 +47,8 @@ To start the ROS2 node that runs segmentation on images from a camera and adjust
 ros2 launch segmentation_node segmentation_node_launch.py
 ```
 
->[!NOTE]
->You can check all available adjustable parameters (topic names, frame ids, not using Octomap, changing number of threads, etc.) by running `ros2 launch segmentation_node segmentation_node_launch.py --show-args`.
+> [!NOTE]
+> You can check all available adjustable parameters (topic names, frame ids, not using Octomap, changing number of threads, etc.) by running `ros2 launch segmentation_node segmentation_node_launch.py --show-args`.
 
 ![Pointcloud with colors based on semantic segmentation](media/semantic_pointcloud.gif)
 
@@ -55,49 +58,39 @@ The launch file starts the segmentation node, Octomap server and RVIZ for visual
 
 ### Class filtering
 
-The segmentation node allows to remove points belonging to selected classes. Users can configure which classes are visible by adjusting the `classes_with_colors` parameter in JSON format, where the boolean value (`true` or `false`) determines whether points from that class are included in the final point cloud visualization. This can be useful to create a general map of the environment, where all movable objects are removed (e.g. cars/people from a road or parking lot). The other usage can be creation of a 3D model of a specific object that is a target of a robot (e.g. a cup on a desk). 
+The segmentation node allows to remove points belonging to selected classes. Users can configure which classes are visible by adjusting the `classes_with_colors` parameter in JSON format, where the boolean value (`true` or `false`) determines whether points from that class are included in the final point cloud visualization. This can be useful to create a general map of the environment, where all movable objects are removed (e.g. cars/people from a road or parking lot). The other usage can be creation of a 3D model of a specific object that is a target of a robot (e.g. a cup on a desk).
 
 ![Example of filtering](/media/filter_no_filter_comp.png)
 
 ## Segmentation models
+
 ## Inference performance
 
-| Model                                   | Input     | Classes | min (ms)  | max (ms)  | mean (ms) | std (ms)  | p90 (ms)  | p99 (ms)  |
-|-----------------------------------------|----------:|--------:|----------:|----------:|----------:|----------:|----------:|----------:|
-| FPN (ResNet-18)                         | 960×608   | 19      | 10.0759   | 29.8761   | 11.5372   |  1.2220   | 13.0184   | 14.3673   |
-| DeepLabV3+ (EfficientNet-B2)            | 960×608   | 19      | 13.2848   | 35.0960   | 15.1419   |  1.5407   | 16.9568   | 19.3563   |
-| FPN (EfficientNet-B0 + SAM2)            | 480×304   | 11      |  2.9341   |  6.2591   |  3.4220   |  0.3605   |  3.8716   |  4.4724   |
-| DeepLabV3+ (MobileNet-V2)               | 960×608   | 19      |  9.3042   | 26.9504   | 10.0985   |  0.8786   | 11.0582   | 12.3670   |
-| LinkNet (MobileNet-V2)                  | 960×608   | 19      |  9.2175   | 26.0415   | 10.1464   |  0.8092   | 11.0638   | 12.0223   |
-| DeepLabV3+ (MobileNet-V2)               | 960×608   | 19      |  9.2910   | 25.4768   | 10.1944   |  0.8288   | 11.1180   | 12.1764   |
-| U-Net (EfficientNet-B2)                 | 960×608   | 19      | 13.8027   | 34.7337   | 15.6287   |  1.3539   | 17.3227   | 18.9289   |
-| SegFormer (EfficientNet-B2)             | 960×608   | 19      | 14.3441   | 41.8935   | 15.7870   |  1.6151   | 17.6692   | 19.5966   |
-| U-Net (MobileNet-V2 + SAM2)             | 480×300   | 11      |  2.9160   |  5.1397   |  3.2360   |  0.1870   |  3.3363   |  4.0436   |
-| LinkNet (ResNet-34)                     | 960×608   | 19      | 12.5198   | 29.3958   | 12.7829   |  0.5589   | 12.9578   | 13.5117   |
-| DeepLabV3+ (EfficientNet-B0 + SAM2)     | 480×304   | 11      |  2.9897   |  4.2260   |  3.3161   |  0.1276   |  3.4464   |  3.5723   |
-
-
+| Model                               |    Input | Classes | min (ms) | max (ms) | mean (ms) | std (ms) | p90 (ms) | p99 (ms) |
+| ----------------------------------- | -------: | ------: | -------: | -------: | --------: | -------: | -------: | -------: |
+| FPN (ResNet-18)                     | 960×608 |      19 |  10.0759 |  29.8761 |   11.5372 |   1.2220 |  13.0184 |  14.3673 |
+| DeepLabV3+ (EfficientNet-B2)        | 960×608 |      19 |  13.2848 |  35.0960 |   15.1419 |   1.5407 |  16.9568 |  19.3563 |
+| FPN (EfficientNet-B0 + SAM2)        | 480×304 |      11 |   2.9341 |   6.2591 |    3.4220 |   0.3605 |   3.8716 |   4.4724 |
+| DeepLabV3+ (MobileNet-V2)           | 960×608 |      19 |   9.3042 |  26.9504 |   10.0985 |   0.8786 |  11.0582 |  12.3670 |
+| LinkNet (MobileNet-V2)              | 960×608 |      19 |   9.2175 |  26.0415 |   10.1464 |   0.8092 |  11.0638 |  12.0223 |
+| DeepLabV3+ (MobileNet-V2)           | 960×608 |      19 |   9.2910 |  25.4768 |   10.1944 |   0.8288 |  11.1180 |  12.1764 |
+| U-Net (EfficientNet-B2)             | 960×608 |      19 |  13.8027 |  34.7337 |   15.6287 |   1.3539 |  17.3227 |  18.9289 |
+| SegFormer (EfficientNet-B2)         | 960×608 |      19 |  14.3441 |  41.8935 |   15.7870 |   1.6151 |  17.6692 |  19.5966 |
+| U-Net (MobileNet-V2 + SAM2)         | 480×300 |      11 |   2.9160 |   5.1397 |    3.2360 |   0.1870 |   3.3363 |   4.0436 |
+| LinkNet (ResNet-34)                 | 960×608 |      19 |  12.5198 |  29.3958 |   12.7829 |   0.5589 |  12.9578 |  13.5117 |
+| DeepLabV3+ (EfficientNet-B0 + SAM2) | 480×304 |      11 |   2.9897 |   4.2260 |    3.3161 |   0.1276 |   3.4464 |   3.5723 |
 
 ## Segmentation models visualisations
 
-| DeepLabV3+ | UNet | FPN |
-|------------|------|-----|
+| DeepLabV3+                                                                                   | UNet                                                                                   | LinkNet                                                                                   |
+| -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | ![DeepLabV3+](https://github.com/user-attachments/assets/75b98bd0-054c-430a-8e98-507324070ed3) | ![UNet](https://github.com/user-attachments/assets/ed6f41f7-f5d6-435c-bbe2-0cf491cf7068) | ![LinkNet](https://github.com/user-attachments/assets/4f29ce41-6288-41e3-a464-64d3218d54a6) |
-| *([DeepLabV3+ citation](https://arxiv.org/abs/1802.02611))* | *([UNet citation](https://arxiv.org/abs/1505.04597))* | *([LinkNet citation](https://www.mdpi.com/2072-4292/14/9/2012))* |
+| *([DeepLabV3+ citation](https://arxiv.org/abs/1802.02611))*                                   | *([UNet citation](https://arxiv.org/abs/1505.04597))*                                   | *([LinkNet citation](https://www.mdpi.com/2072-4292/14/9/2012))*                           |
 
-| SegFormer | LinkNet |  |
-|-----------|---------|--|
+| SegFormer                                                                                   | FPN                                                                                   |  |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | - |
 | ![SegFormer](https://github.com/user-attachments/assets/89b29b42-db08-4251-b65a-9bde18db4d1e) | ![FPN](https://github.com/user-attachments/assets/abd8ce18-3b97-483d-a396-a918ae449cd0) |  |
-| *([SegFormer citation](https://arxiv.org/abs/2105.15203))* | *([FPN citation](https://doi.org/10.1007/s00521-019-04546-6))* |  |
-
-
-
-
-
-
-
-
-
+| *([SegFormer citation](https://arxiv.org/abs/2105.15203))*                                   | *([FPN citation](https://doi.org/10.1007/s00521-019-04546-6))*                         |  |
 
 ## Tools
 
@@ -110,12 +103,13 @@ python3 ros2_bag_to_png.py --bagfile <path to rosbag> --topics <string with topi
 ```
 
 Example:
+
 ```
 python3 ros2_bag_to_png.py --bagfile ~/Shared/rosbags/rosbag2_2025_04_14-17_54_17/ --topics '/sensing/camera/front/image_raw' --output '/root/images_from_rosbags/'
 ```
 
->[!NOTE]
->Inside the script the distortion parameters are defined. You can adjust them to work with your camera. You can find the parameters in appropriate ROS2 topic.
+> [!NOTE]
+> Inside the script the distortion parameters are defined. You can adjust them to work with your camera. You can find the parameters in appropriate ROS2 topic.
 
 ### Annotate the data with GroundingDINO and SAM2
 
