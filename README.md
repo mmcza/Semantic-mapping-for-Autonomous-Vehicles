@@ -60,13 +60,22 @@ The segmentation node allows to remove points belonging to selected classes. Use
 ![Example of filtering](/media/filter_no_filter_comp.png)
 
 ## Segmentation models
-| Model                                        | Input      | Classes | FPS                 |
-|----------------------------------------------|------------|---------|---------------------|
-| DeepLabV3+ (EfficientNet-B0 + SAM2)          | 480 × 304  | 11      |                     |
-| DeepLabV3+ (EfficientNet-B2, 19-class)       | 960 × 608  | 19      |                     | 
-| DeepLabV3+ (MobileNetV2)                     | 960 × 608  | 19      |                     | 
-| LinkNet (MobileNetV2)                        | 960 × 608  | 19      |                     |
-| U-Net (EfficientNet-B2)                      | 960 × 608  | 19      |                     |
+## Inference performance
+
+| Model                                   | Input     | Classes | min (ms)  | max (ms)  | mean (ms) | std (ms)  | p90 (ms)  | p99 (ms)  |
+|-----------------------------------------|----------:|--------:|----------:|----------:|----------:|----------:|----------:|----------:|
+| FPN (ResNet-18)                         | 960×608   | 19      | 10.0759   | 29.8761   | 11.5372   |  1.2220   | 13.0184   | 14.3673   |
+| DeepLabV3+ (EfficientNet-B2)            | 960×608   | 19      | 13.2848   | 35.0960   | 15.1419   |  1.5407   | 16.9568   | 19.3563   |
+| FPN (EfficientNet-B0 + SAM2)            | 480×304   | 11      |  2.9341   |  6.2591   |  3.4220   |  0.3605   |  3.8716   |  4.4724   |
+| DeepLabV3+ (MobileNet-V2)               | 960×608   | 19      |  9.3042   | 26.9504   | 10.0985   |  0.8786   | 11.0582   | 12.3670   |
+| LinkNet (MobileNet-V2)                  | 960×608   | 19      |  9.2175   | 26.0415   | 10.1464   |  0.8092   | 11.0638   | 12.0223   |
+| DeepLabV3+ (MobileNet-V2)               | 960×608   | 19      |  9.2910   | 25.4768   | 10.1944   |  0.8288   | 11.1180   | 12.1764   |
+| U-Net (EfficientNet-B2)                 | 960×608   | 19      | 13.8027   | 34.7337   | 15.6287   |  1.3539   | 17.3227   | 18.9289   |
+| SegFormer (EfficientNet-B2)             | 960×608   | 19      | 14.3441   | 41.8935   | 15.7870   |  1.6151   | 17.6692   | 19.5966   |
+| U-Net (MobileNet-V2 + SAM2)             | 480×300   | 11      |  2.9160   |  5.1397   |  3.2360   |  0.1870   |  3.3363   |  4.0436   |
+| LinkNet (ResNet-34)                     | 960×608   | 19      | 12.5198   | 29.3958   | 12.7829   |  0.5589   | 12.9578   | 13.5117   |
+| DeepLabV3+ (EfficientNet-B0 + SAM2)     | 480×304   | 11      |  2.9897   |  4.2260   |  3.3161   |  0.1276   |  3.4464   |  3.5723   |
+
 
 
 ## Segmentation models visualisations
