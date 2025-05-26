@@ -115,8 +115,10 @@ The segmentation node allows to remove points belonging to selected classes. Use
 | — | ![#0000E6](https://img.shields.io/badge/-0000E6?style=flat-square&logoColor=white) `17: motorcycle` (0,0,230) |
 | — | ![#770B20](https://img.shields.io/badge/-770B20?style=flat-square&logoColor=white) `18: bicycle` (119,11,32) |
 
-##
+## Segmentation Annotation Viewer
 ![media](https://github.com/mmcza/Semantic-mapping-for-Autonomous-Vehicles/blob/main/media/viewer.png)
+
+A minimaltool for interactively browsing raw camera frames and their corresponding `*_segmented_mask.png` overlays. It auto-scans all `images_*` folders under `annotations2/`, pairs masks with their `_image_raw_*.png` counterparts (by suffix after `__`), and displays them vertically. Use “Prev”/“Next” to navigate and “Delete” to move bad pairs into `deleted/`.
 
 ## Created datasets links
 SAM2 generated masks: https://www.kaggle.com/datasets/mrj111/sem-seg-veh/data
