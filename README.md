@@ -92,6 +92,29 @@ The segmentation node allows to remove points belonging to selected classes. Use
 | ![SegFormer](https://github.com/user-attachments/assets/89b29b42-db08-4251-b65a-9bde18db4d1e) | ![FPN](https://github.com/user-attachments/assets/abd8ce18-3b97-483d-a396-a918ae449cd0) |  |
 | *([SegFormer citation](https://arxiv.org/abs/2105.15203))*                                   | *([FPN citation](https://doi.org/10.1007/s00521-019-04546-6))*                         |  |
 
+## Class Definitions Comparison
+| Custom SAM2 Classes (11) | Cityscapes Classes (19) |
+|---------------------|-------------------------|
+| ![#000000](https://img.shields.io/badge/-000000?style=flat-square&logoColor=white) `0: Other` | ![#804080](https://img.shields.io/badge/-804080?style=flat-square&logoColor=white) `0: road` |
+| ![#87CEEB](https://img.shields.io/badge/-87CEEB?style=flat-square&logoColor=white) `1: Sky` | ![#F423E8](https://img.shields.io/badge/-F423E8?style=flat-square&logoColor=white) `1: sidewalk` |
+| ![#464646](https://img.shields.io/badge/-464646?style=flat-square&logoColor=white) `2: Building` | ![#464646](https://img.shields.io/badge/-464646?style=flat-square&logoColor=white) `2: building` |
+| ![#008000](https://img.shields.io/badge/-008000?style=flat-square&logoColor=white) `3: Grass` | ![#66669C](https://img.shields.io/badge/-66669C?style=flat-square&logoColor=white) `3: wall` |
+| ![#D2B48C](https://img.shields.io/badge/-D2B48C?style=flat-square&logoColor=white) `4: Sand, Mud` | ![#BE9999](https://img.shields.io/badge/-BE9999?style=flat-square&logoColor=white) `4: fence` |
+| ![#808080](https://img.shields.io/badge/-808080?style=flat-square&logoColor=white) `5: Road, Asphalt, Cobblestone` | ![#999999](https://img.shields.io/badge/-999999?style=flat-square&logoColor=white) `5: pole` |
+| ![#8B4513](https://img.shields.io/badge/-8B4513?style=flat-square&logoColor=white) `6: Fence` | ![#FAAA1E](https://img.shields.io/badge/-FAAA1E?style=flat-square&logoColor=white) `6: traffic light` |
+| ![#228B22](https://img.shields.io/badge/-228B22?style=flat-square&logoColor=white) `7: Tree` | ![#DCDC00](https://img.shields.io/badge/-DCDC00?style=flat-square&logoColor=white) `7: traffic sign` |
+| ![#FFD700](https://img.shields.io/badge/-FFD700?style=flat-square&logoColor=white) `8: Sign, Lamp, Pole, Cone, Bike` | ![#6B8E23](https://img.shields.io/badge/-6B8E23?style=flat-square&logoColor=white) `8: vegetation` |
+| ![#FF0000](https://img.shields.io/badge/-FF0000?style=flat-square&logoColor=white) `9: Car, Truck` | ![#98FB98](https://img.shields.io/badge/-98FB98?style=flat-square&logoColor=white) `9: terrain` |
+| ![#FFC0CB](https://img.shields.io/badge/-FFC0CB?style=flat-square&logoColor=white) `10: Person` | ![#4682B4](https://img.shields.io/badge/-4682B4?style=flat-square&logoColor=white) `10: sky` |
+| — | ![#DC143C](https://img.shields.io/badge/-DC143C?style=flat-square&logoColor=white) `11: person` |
+| — | ![#FF0000](https://img.shields.io/badge/-FF0000?style=flat-square&logoColor=white) `12: rider` |
+| — | ![#00008E](https://img.shields.io/badge/-00008E?style=flat-square&logoColor=white) `13: car` |
+| — | ![#000046](https://img.shields.io/badge/-000046?style=flat-square&logoColor=white) `14: truck` |
+| — | ![#003C64](https://img.shields.io/badge/-003C64?style=flat-square&logoColor=white) `15: bus` |
+| — | ![#005064](https://img.shields.io/badge/-005064?style=flat-square&logoColor=white) `16: train` |
+| — | ![#0000E6](https://img.shields.io/badge/-0000E6?style=flat-square&logoColor=white) `17: motorcycle` |
+| — | ![#770B20](https://img.shields.io/badge/-770B20?style=flat-square&logoColor=white) `18: bicycle` |
+
 ## Tools
 
 ### Get images from rosbags
