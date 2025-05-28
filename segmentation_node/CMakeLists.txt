@@ -62,6 +62,11 @@ add_executable(segmentation_node
   src/segmentation_node.cpp
 )
 
+add_executable(semantic_octomap_saver src/semantic_octomap_saver.cpp)
+
+ament_target_dependencies(semantic_octomap_saver rclcpp sensor_msgs pcl_conversions)
+target_link_libraries(semantic_octomap_saver ${PCL_LIBRARIES})
+
 # Set OpenMP flags
 if (OpenMP_FOUND)
     target_link_libraries(segmentation_node OpenMP::OpenMP_CXX)
@@ -99,7 +104,7 @@ target_link_libraries(segmentation_node
 )
 
 # Install the executable
-install(TARGETS segmentation_node
+install(TARGETS segmentation_node semantic_octomap_saver
   DESTINATION lib/${PROJECT_NAME})
 
 # Install launch files

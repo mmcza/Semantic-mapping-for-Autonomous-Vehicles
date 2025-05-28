@@ -45,8 +45,7 @@ def generate_launch_description():
             'resolution': LaunchConfiguration('octomap_resolution'),
             'height_map': False,
             'filter_ground': False,
-            'latch': False,
-            'color_factor': 1.0,
+            'latch': False
         }]
     )
 

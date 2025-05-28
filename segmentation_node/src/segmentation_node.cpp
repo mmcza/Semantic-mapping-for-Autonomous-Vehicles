@@ -503,8 +503,7 @@ void SegmentationNode::postprocess_output(const std::vector<Ort::Value>& output_
                 output_point.rgb = *reinterpret_cast<float*>(&rgb);
 
                 // Add point to thread-local vector
-                size_t point_index = thread_point_counts[thread_id];
-                thread_points[thread_id][point_index] = output_point;
+                thread_points[thread_id].push_back(output_point);
                 thread_point_counts[thread_id]++;
             }
         }
