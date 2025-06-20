@@ -11,6 +11,9 @@
     - [Get images from rosbags](#get-images-from-rosbags)
     - [Annotate the data with GroundingDINO and SAM2](#annotate-the-data-with-groundingdino-and-sam2)
 
+> **IMPORTANT:**  
+> The recorded datasets included in this repository were prepared for testing purposes using different labels than those described in the original article.  
+> This is intended to facilitate validation and experimentation with alternative annotation schemes.
 ![Octomap generation](/media/semantic_octomap_generation.gif)
 
 An example of an Octomap created with the additional semantic information. The recording was sped up 10x to show the complete mapping process.
