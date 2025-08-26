@@ -176,6 +176,7 @@ cython_debug/
 # Training logs
 segmentation_model_training/checkpoints/*
 segmentation_model_training/logs/*
+supervisely_viz/*
 
 # VSCode settings
 .vscode/
