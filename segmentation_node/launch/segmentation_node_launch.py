@@ -87,32 +87,22 @@ def generate_launch_description():
     
     declare_model_path_arg = DeclareLaunchArgument(
         'model_path',
-        default_value='/root/Shared/saved_models/dl3plus_eff_b2_960_608_19C.onnx',
+        default_value='/root/Shared/saved_models/UNETtu-mobilenetv4_conv_small-new_VER.onnx',
         description='Path to the ONNX segmentation model'
     )
 
     declare_classes_with_colors_arg = DeclareLaunchArgument(
         'classes_with_colors',
         default_value='{' \
-            ' "0": ["road", [128, 64, 128], true],' \
-            ' "1": ["sidewalk", [244, 35, 232], true],' \
+            ' "0": ["other", [0, 0, 0], true],' \
+            ' "1": ["sky", [70, 130, 180], true],' \
             ' "2": ["building", [70, 70, 70], true],' \
-            ' "3": ["wall", [102, 102, 156], true],' \
-            ' "4": ["fence", [190, 153, 153], true],' \
-            ' "5": ["pole", [153, 153, 153], true],' \
-            ' "6": ["traffic light", [250, 170, 30], true],' \
-            ' "7": ["traffic sign", [220, 220, 0], true],' \
-            ' "8": ["vegetation", [107, 142, 35], true],' \
-            ' "9": ["terrain", [152, 251, 152], true],' \
-            ' "10": ["sky", [70, 130, 180], true],' \
-            ' "11": ["person", [220, 20, 60], true],' \
-            ' "12": ["rider", [255, 0, 0], true],' \
-            ' "13": ["car", [0, 0, 142], true],' \
-            ' "14": ["truck", [0, 0, 70], true],' \
-            ' "15": ["bus", [0, 60, 100], true],' \
-            ' "16": ["train", [0, 80, 100], true],' \
-            ' "17": ["motorcycle", [0, 0, 230], true],' \
-            ' "18": ["bicycle", [119, 11, 32], true]' \
+            ' "3": ["grass", [152, 251, 152], true],' \
+            ' "4": ["road", [128, 64, 128], true],' \
+            ' "5": ["tree", [107, 142, 35], true],' \
+            ' "6": ["traffic_light", [220, 220, 0], true],' \
+            ' "7": ["car", [0, 0, 142], true],' \
+            ' "8": ["person", [255, 0, 0], true]' \
         '}',
         description='JSON string of CITY SCAPES classes with their corresponding colors in RGB format and boolean visibility flag'
     )

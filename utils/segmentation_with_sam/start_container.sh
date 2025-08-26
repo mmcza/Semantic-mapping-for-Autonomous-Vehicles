@@ -25,7 +25,7 @@ docker run -it --rm \
 	--env="DISPLAY" \
 	--env="QT_X11_NO_MITSHM=1" \
 	--volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" --privileged \
-	--volume="/home/$user/semantic_maps_images:/root/Shared:rw" \
+	--volume="/home/$user/semantic_maps_images:/root/Shared/semantic_maps_iamges:rw" \
 	--gpus all \
 	--env="XAUTHORITY=$XAUTH" \
 	--volume="$XAUTH:$XAUTH" \
